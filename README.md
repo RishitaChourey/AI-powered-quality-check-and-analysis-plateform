@@ -1,4 +1,4 @@
-# 🚀 Phase 1: Clone the Repository
+🚀 Phase 1: Clone the Repository
 
 Open a terminal and run this exact command:
 
