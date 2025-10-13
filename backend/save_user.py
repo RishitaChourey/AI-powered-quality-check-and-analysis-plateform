@@ -17,9 +17,6 @@ def ensure_table():
     conn.close()
 
 def register_user(username, email, password):
-    """
-    Register a new user. Returns (success: bool, message: str)
-    """
     ensure_table()
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
@@ -34,9 +31,6 @@ def register_user(username, email, password):
         conn.close()
 
 def check_login(email, password):
-    """
-    Check login for existing user. Returns (success: bool, message: str)
-    """
     ensure_table()
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
@@ -46,8 +40,8 @@ def check_login(email, password):
 
     if not user:
         return False, "User does not exist. Please sign up first."
-    stored_password = user[3]
-    if stored_password == password:
+    
+    if user[3] == password:  # index 3 = password
         return True, "Login successful."
     else:
         return False, "Incorrect password."
