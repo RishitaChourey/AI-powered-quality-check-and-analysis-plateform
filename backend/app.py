@@ -1,29 +1,25 @@
 from fastapi import FastAPI, File, UploadFile, HTTPException
 from fastapi.responses import StreamingResponse, JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
 from ultralytics import YOLO
-import io
 from PIL import Image
+import sqlite3
+import io
 import os
 import sys
-import shutil # New import for directory cleanup
+import shutil
 
-# --- CRITICAL SETUP INSTRUCTIONS (Rerun if needed) ---
-# 1. CLONE: git clone https://github.com/sunsmarterjie/yolov12.git
-# 2. INSTALL: pip install -e ./yolov12
-# 3. WEIGHTS: best.pt in the 'weights' folder.
-# ---------------------------------------------------------------------
-
-# Add the custom yolov12 folder to the Python path
+# -------------------------------
+# Add YOLOv12 folder to path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'yolov12'))
 
-app = FastAPI(
-    title="PPE Detection API",
-    description="Custom YOLOv12 inference backend.",
-    version="1.0.0"
-)
+# -------------------------------
+# FastAPI App
+app = FastAPI(title="PPE Detection + Auth API", version="1.0")
 
-# Configure CORS
+# -------------------------------
+# CORS
 origins = ["*", "http://localhost:3000", "http://127.0.0.1:8000"]
 app.add_middleware(
     CORSMiddleware,
@@ -33,102 +29,132 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# --- Model Loading ---
+# -------------------------------
+# YOLOv12 Model
 MODEL_PATH = "weights/best.pt"
-model = None 
+model = None
 
 @app.on_event("startup")
 async def load_model():
-    """Loads the custom YOLOv12 model."""
     global model
     if not os.path.exists(MODEL_PATH):
         raise RuntimeError(f"Model weights not found at {MODEL_PATH}.")
-
     try:
         model = YOLO(MODEL_PATH)
         print(f"INFO: Successfully loaded custom YOLOv12 model from {MODEL_PATH}")
     except Exception as e:
-        error_msg = f"Critical Model Loading Failure: {e}"
-        print(f"FATAL ERROR: {error_msg}")
-        raise RuntimeError(f"YOLOv12 Custom Model Load Error: {error_msg}. Follow setup steps.") from e
+        raise RuntimeError(f"YOLOv12 Load Error: {e}") from e
 
-# --- API Endpoint ---
+# -------------------------------
+# SQLite DB Setup for Users
+DB_FILE = "users.db"
+if not os.path.exists(DB_FILE):
+    conn = sqlite3.connect(DB_FILE)
+    c = conn.cursor()
+    c.execute('''
+        CREATE TABLE users (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL,
+            email TEXT UNIQUE NOT NULL,
+            password TEXT NOT NULL
+        )
+    ''')
+    conn.commit()
+    conn.close()
 
+# -------------------------------
+# User Model
+class User(BaseModel):
+    name: str = None
+    email: str
+    password: str
+
+# -------------------------------
+# Signup Route
+@app.post("/api/signup")
+async def signup(user: User):
+    try:
+        conn = sqlite3.connect(DB_FILE)
+        c = conn.cursor()
+        c.execute("INSERT INTO users (name, email, password) VALUES (?, ?, ?)",
+                  (user.name, user.email, user.password))
+        conn.commit()
+        conn.close()
+        return JSONResponse(content={"message": "User created successfully!"}, status_code=201)
+    except sqlite3.IntegrityError:
+        return JSONResponse(content={"message": "Email already exists."}, status_code=400)
+    except Exception as e:
+        return JSONResponse(content={"message": f"Server error: {e}"}, status_code=500)
+
+# -------------------------------
+# Login Route
+@app.post("/api/login")
+async def login(user: User):
+    try:
+        conn = sqlite3.connect(DB_FILE)
+        c = conn.cursor()
+        c.execute("SELECT * FROM users WHERE email=? AND password=?", (user.email, user.password))
+        row = c.fetchone()
+        conn.close()
+
+        if row:
+            return JSONResponse(content={"message": "Login successful!"}, status_code=200)
+        else:
+            return JSONResponse(content={"message": "Invalid email or password."}, status_code=401)
+    except Exception as e:
+        return JSONResponse(content={"message": f"Server error: {e}"}, status_code=500)
+
+# -------------------------------
+# PPE Image Check Endpoint
 @app.post("/api/check_ppe_image/")
 async def check_ppe_image(file: UploadFile = File(...)):
-    """Runs YOLOv12 inference and returns the resulting image."""
-    
     if not file.content_type.startswith('image/'):
         raise HTTPException(status_code=400, detail="File must be an image (JPEG, PNG).")
     
     if model is None:
-        raise HTTPException(status_code=503, detail="Model is not initialized. Server startup failed.")
+        raise HTTPException(status_code=503, detail="Model not initialized.")
 
     content = await file.read()
     image_stream = io.BytesIO(content)
-    
-    # Define a temporary folder name for YOLO to save its output
-    # This ensures we know exactly where the results are.
     temp_run_dir = os.path.join("temp_runs", os.urandom(8).hex())
-    
+
     try:
         input_image = Image.open(image_stream).convert("RGB")
-        
-        # 3. Perform Inference
-        # 'project=temp_runs' defines the parent directory (relative to current working dir)
-        # 'name=...' defines the run name (which results in temp_runs/run_name)
         results = model.predict(
-            source=input_image, 
-            save=True, 
-            project="temp_runs", 
-            name=os.urandom(8).hex(), # Use random name to prevent conflicts
-            exist_ok=True, 
+            source=input_image,
+            save=True,
+            project="temp_runs",
+            name=os.urandom(8).hex(),
+            exist_ok=True,
             verbose=False
         )
-        
-        # 4. Retrieve Processed Image (FIXED LOGIC)
+
         if results and len(results) > 0:
             result = results[0]
-            
-            # result.save_dir is the full path to the directory where the output was saved.
-            # result.path is the filename (e.g., 'image0.jpg').
-            # We must join them to get the absolute path.
             result_path = os.path.join(result.save_dir, result.path)
-            
-            # Check if the generated file actually exists before opening
+
             if not os.path.exists(result_path):
-                raise FileNotFoundError(f"YOLO output file not found at: {result_path}")
+                raise FileNotFoundError(f"YOLO output not found: {result_path}")
 
             processed_image = Image.open(result_path)
-            
-            # 5. Prepare Output
             output_stream = io.BytesIO()
             processed_image.save(output_stream, format="JPEG", quality=90)
             output_stream.seek(0)
-            
-            # 6. Return StreamingResponse
+
             return StreamingResponse(
                 output_stream,
                 media_type="image/jpeg",
                 headers={"Content-Disposition": f"attachment; filename=result_{file.filename}.jpeg"}
             )
         else:
-            raise HTTPException(status_code=500, detail="YOLO inference ran, but produced no results.")
+            raise HTTPException(status_code=500, detail="YOLO inference produced no results.")
 
     except Exception as e:
-        print(f"Critical Processing Error: {e}")
-        # General catch-all for inference failures
-        raise HTTPException(
-            status_code=500, 
-            detail=f"Internal Server Error during AI processing: {e}"
-        )
+        raise HTTPException(status_code=500, detail=f"AI processing error: {e}")
     finally:
-        # 7. CLEANUP: Remove the temporary directory created by YOLO
         if os.path.exists(temp_run_dir):
             try:
                 shutil.rmtree(temp_run_dir)
                 print(f"INFO: Cleaned up temporary directory: {temp_run_dir}")
             except OSError as e:
-                print(f"WARNING: Could not remove temporary directory {temp_run_dir}: {e}")
-
-
+                print(f"WARNING: Could not remove temp dir {temp_run_dir}: {e}")

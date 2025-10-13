@@ -1,3 +1,4 @@
+// src/views/SignupView.jsx
 import React, { useState } from 'react';
 
 const SignupView = ({ onNavigate }) => {
@@ -14,24 +15,41 @@ const SignupView = ({ onNavigate }) => {
     setLoading(true);
     setSuccess(false);
 
-    // Simulate network delay and validation (no actual saving)
-    await new Promise(resolve => setTimeout(resolve, 500));
-
+    // Password length validation
     if (password.length < 6) {
-        setError('Password must be at least 6 characters long.');
-        setLoading(false);
-        return;
+      setError('Password must be at least 6 characters long.');
+      setLoading(false);
+      return;
     }
 
-    // --- MOCK DATABASE ACTION ---
-    console.log(`Mock Sign Up: User ${name} with email ${email}`);
-    setSuccess(true);
-    
-    // Automatically navigate to Login after successful signup simulation
-    setTimeout(() => onNavigate('Login'), 2000); 
-    // --- END MOCK DATABASE ACTION ---
-    
-    setLoading(false);
+    try {
+      const response = await fetch('http://127.0.0.1:8000/api/signup', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ name, email, password })
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        setSuccess(true);
+        setName('');
+        setEmail('');
+        setPassword('');
+
+        // Redirect to login after success
+        setTimeout(() => onNavigate('Login'), 1500);
+      } else {
+        setError(data.detail || data.message || 'Signup failed.');
+      }
+    } catch (err) {
+      console.error('Signup error:', err);
+      setError('Network error: Could not connect to backend.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -54,9 +72,9 @@ const SignupView = ({ onNavigate }) => {
             />
           </div>
 
-          {/* Mail Input */}
+          {/* Email Input */}
           <div>
-            <label htmlFor="signup-email" className="block text-lg font-medium mb-2">Mail:</label>
+            <label htmlFor="signup-email" className="block text-lg font-medium mb-2">Email:</label>
             <input
               id="signup-email"
               type="email"
@@ -67,7 +85,7 @@ const SignupView = ({ onNavigate }) => {
               required
             />
           </div>
-          
+
           {/* Password Input */}
           <div>
             <label htmlFor="signup-password" className="block text-lg font-medium mb-2">Password:</label>
@@ -82,16 +100,7 @@ const SignupView = ({ onNavigate }) => {
             />
           </div>
 
-          {/* Remember Me Checkbox (UI only) */}
-          <div className="flex items-center">
-            <input
-              id="remember-me"
-              type="checkbox"
-              className="h-4 w-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
-            />
-            <label htmlFor="remember-me" className="ml-2 block text-sm">Remember me</label>
-          </div>
-
+          {/* Submit Button */}
           <div className="flex justify-end">
             <button
               type="submit"
@@ -102,18 +111,18 @@ const SignupView = ({ onNavigate }) => {
             </button>
           </div>
 
-          {error && (
-            <p className="text-red-300 text-center pt-2">{error}</p>
-          )}
-          
+          {/* Error & Success Messages */}
+          {error && <p className="text-red-300 text-center pt-2">{error}</p>}
           {success && (
-            <p className="text-green-300 text-center pt-2 font-bold">Success! Account created. Redirecting to login...</p>
+            <p className="text-green-300 text-center pt-2 font-bold">
+              Success! Account created. Redirecting to login...
+            </p>
           )}
-
         </form>
-        
+
+        {/* Back to Login Button */}
         <div className="text-center mt-6">
-          <button 
+          <button
             onClick={() => onNavigate('Login')}
             className="text-white font-semibold underline hover:text-indigo-200 transition duration-150"
           >
