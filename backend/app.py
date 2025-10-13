@@ -52,12 +52,12 @@ async def predict(file: UploadFile = File(...)):
                 })
 
         # Annotated image path — YOLO saves as 'image0.jpg'
-        annotated_path = "static/detections/image0.jpg"
+        annotated_path = "/static/detections/{file.filename}"
 
         return JSONResponse({
             "detections": detections,
             "original_image": f"/static/uploads/{file.filename}",
-            "annotated_image": f"/{annotated_path.replace(os.sep, '/')}"
+            "annotated_image": f"/static/detections/{file.filename}"
         })
 
     except Exception as e:

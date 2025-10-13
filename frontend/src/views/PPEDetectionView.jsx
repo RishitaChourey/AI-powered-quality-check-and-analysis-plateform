@@ -4,17 +4,20 @@ import axios from "axios";
 const PPEDetectionView = () => {
   const [file, setFile] = useState(null);
   const [detections, setDetections] = useState([]);
-  const [originalImage, setOriginalImage] = useState("");
-  const [annotatedImage, setAnnotatedImage] = useState("");
+  const [originalMedia, setOriginalMedia] = useState("");
+  const [annotatedMedia, setAnnotatedMedia] = useState("");
   const [loading, setLoading] = useState(false);
+  const [isVideo, setIsVideo] = useState(false);
 
   const handleFileChange = (e) => {
-    setFile(e.target.files[0]);
+    const selectedFile = e.target.files[0];
+    setFile(selectedFile);
+    setIsVideo(selectedFile && selectedFile.type.startsWith("video/"));
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!file) return alert("Please upload an image first!");
+    if (!file) return alert("Please upload an image or video first!");
 
     const formData = new FormData();
     formData.append("file", file);
@@ -26,9 +29,9 @@ const PPEDetectionView = () => {
       });
 
       const data = res.data;
-      setDetections(data.detections);
-      setOriginalImage(`http://127.0.0.1:8000${data.original_image}`);
-      setAnnotatedImage(`http://127.0.0.1:8000${data.annotated_image}`);
+      setDetections(data.detections || []);
+      setOriginalMedia(`http://127.0.0.1:8000${data.original_media}`);
+      setAnnotatedMedia(`http://127.0.0.1:8000${data.annotated_media}`);
     } catch (err) {
       console.error("Prediction error:", err);
       alert("Something went wrong while detecting PPE.");
@@ -39,12 +42,14 @@ const PPEDetectionView = () => {
 
   return (
     <div className="flex flex-col items-center mt-8">
-      <h2 className="text-2xl font-semibold mb-4 text-gray-700">PPE Detection</h2>
+      <h2 className="text-2xl font-semibold mb-4 text-gray-700">
+        PPE Detection (Image/Video)
+      </h2>
 
       <form onSubmit={handleSubmit} className="flex flex-col items-center gap-3">
         <input
           type="file"
-          accept="image/*"
+          accept="image/*,video/*"
           onChange={handleFileChange}
           className="p-2 border rounded"
         />
@@ -71,26 +76,42 @@ const PPEDetectionView = () => {
         </div>
       )}
 
-      {(originalImage || annotatedImage) && (
-        <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-4">
-          {originalImage && (
+      {(originalMedia || annotatedMedia) && (
+        <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-6">
+          {originalMedia && (
             <div>
-              <h3 className="text-lg font-semibold mb-2">Original Image:</h3>
-              <img
-                src={originalImage}
-                alt="Original Upload"
-                className="rounded-lg shadow-lg max-w-md"
-              />
+              <h3 className="text-lg font-semibold mb-2">Original:</h3>
+              {isVideo ? (
+                <video
+                  src={originalMedia}
+                  controls
+                  className="rounded-lg shadow-lg max-w-md"
+                />
+              ) : (
+                <img
+                  src={originalMedia}
+                  alt="Original Upload"
+                  className="rounded-lg shadow-lg max-w-md"
+                />
+              )}
             </div>
           )}
-          {annotatedImage && (
+          {annotatedMedia && (
             <div>
               <h3 className="text-lg font-semibold mb-2">Detected PPE:</h3>
-              <img
-                src={annotatedImage}
-                alt="Detected PPE"
-                className="rounded-lg shadow-lg max-w-md"
-              />
+              {isVideo ? (
+                <video
+                  src={annotatedMedia}
+                  controls
+                  className="rounded-lg shadow-lg max-w-md"
+                />
+              ) : (
+                <img
+                  src={annotatedMedia}
+                  alt="Detected PPE"
+                  className="rounded-lg shadow-lg max-w-md"
+                />
+              )}
             </div>
           )}
         </div>
