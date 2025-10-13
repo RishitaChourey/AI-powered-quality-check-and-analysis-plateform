@@ -3,6 +3,7 @@ import React, { useState } from 'react';
 // Components
 import Header from './components/Header';
 import TitleBanner from './components/TitleBanner';
+import PPEDetectionView from './views/PPEDetectionView';
 
 // Views
 import HomeView from './views/HomeView';
@@ -49,10 +50,14 @@ const App = () => {
     }
   };
 
-  const handleSelectCheck = (type) => {
-    setCheckType(type);
+const handleSelectCheck = (type) => {
+  if (type === 'PPE') {
+    setCurrentPage('PPE'); // Go to PPEDetectionView
+  } else {
+    setCheckType(type);    // For other check types
     setCurrentPage('CheckPage');
-  };
+  }
+};
   
   // --- Render Content based on Auth State and Page ---
   
@@ -94,6 +99,9 @@ const App = () => {
           break;
         case 'About':
             content = <AboutView onNavigate={handleNavigate} />; // Logged in About view
+            break;
+        case 'PPE':
+            content = <PPEDetectionView />;
             break;
         case 'Home':
         default:
