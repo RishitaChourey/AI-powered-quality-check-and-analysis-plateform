@@ -6,44 +6,21 @@ import TitleBanner from './components/TitleBanner';
 import PPEDetectionView from './views/PPEDetectionView';
 
 // Views
-import HomeView from './views/HomeView';
-import DashboardView from './views/DashboardView';
-import NotificationsView from './views/NotificationsView';
-import CheckView from './views/CheckView';
-import AboutView from './views/AboutView'; // Import new About View
-
-// Authentication Views
 import LoginView from './views/LoginView';
 import SignupView from './views/SignupView';
 import ForgotPasswordView from './views/ForgotPasswordView';
+import HomeView from './views/HomeView';
 
-/**
- * Main App Component: Handles routing and local authentication state.
- */
 const App = () => {
-  // Start on Login page
-  const [currentPage, setCurrentPage] = useState('Login'); 
-  const [checkType, setCheckType] = useState(null); 
-  const [isLoggedIn, setIsLoggedIn] = useState(false); // Local authentication state
+  const [currentPage, setCurrentPage] = useState('Login');
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
 
-  // Navigate to Home upon successful login
   const handleLoginSuccess = () => {
     setIsLoggedIn(true);
     setCurrentPage('Home');
   };
 
-  const handleLogout = () => {
-    setIsLoggedIn(false);
-    setCurrentPage('Login');
-  };
-
-  // Navigation Handlers
   const handleNavigate = (page) => {
-    // If not logged in, only allow Auth and About pages
-    if (!isLoggedIn && !['Login', 'Signup', 'ForgotPassword', 'About'].includes(page)) {
-        setCurrentPage('Login');
-        return;
-    }
     setCurrentPage(page);
     if (page !== 'CheckPage') {
       setCheckType(null);
@@ -61,6 +38,8 @@ const handleSelectCheck = (type) => {
   
   // --- Render Content based on Auth State and Page ---
   
+  };
+
   let content;
 
   // Render Authentication Views or public About View if not logged in
@@ -108,27 +87,25 @@ const handleSelectCheck = (type) => {
           content = <HomeView onSelectCheck={handleSelectCheck} />;
           break;
       }
+  switch (currentPage) {
+    case 'Signup':
+      content = <SignupView onNavigate={handleNavigate} />;
+      break;
+    case 'ForgotPassword':
+      content = <ForgotPasswordView onNavigate={handleNavigate} />;
+      break;
+    case 'Home':
+      content = <HomeView />;
+      break;
+    case 'Login':
+    default:
+      content = <LoginView onNavigate={handleNavigate} onLoginSuccess={handleLoginSuccess} />;
+      break;
   }
 
-  const isAuthView = ['Login', 'Signup', 'ForgotPassword'].includes(currentPage);
-  
   return (
     <div className="min-h-screen bg-gray-50 font-sans">
-      <Header 
-        onNavigate={handleNavigate} 
-        currentPage={currentPage} 
-        checkType={checkType} 
-        user={null} // Mock user for now
-        isAuthenticated={isLoggedIn}
-        onLogout={handleLogout}
-      />
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        {/* Only show TitleBanner if not on an auth/about page */}
-        {!isAuthView && currentPage !== 'About' && <TitleBanner />} 
-        <div className="pb-12">
-          {content}
-        </div>
-      </main>
+      {content}
     </div>
   );
 };

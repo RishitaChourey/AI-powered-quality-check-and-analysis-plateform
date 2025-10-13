@@ -1,9 +1,5 @@
 import React, { useState } from 'react';
 
-// Hardcoded credentials for development
-const HARDCODED_EMAIL = 'test@example.com';
-const HARDCODED_PASSWORD = 'password';
-
 const LoginView = ({ onNavigate, onLoginSuccess }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -13,18 +9,35 @@ const LoginView = ({ onNavigate, onLoginSuccess }) => {
   const handleLogin = async (e) => {
     e.preventDefault();
     setError('');
+
+    // --- Client-side validations ---
+    if (!email.includes('@gmail.com')) {
+      setError('Email must be a valid @gmail.com address');
+      return;
+    }
+    if (password.length < 6) {
+      setError('Password must be at least 6 characters');
+      return;
+    }
     setLoading(true);
 
-    // Simulate network delay
-    await new Promise(resolve => setTimeout(resolve, 500));
+    try {
+      const response = await fetch("http://127.0.0.1:5000/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username: email, email, password }),
+      });
 
-    // --- HARDCODED AUTH CHECK ---
-    if (email === HARDCODED_EMAIL && password === HARDCODED_PASSWORD) {
-      onLoginSuccess();
-    } else {
-      setError('Invalid username or password.');
+      const data = await response.json();
+      if (response.ok) {
+        onLoginSuccess();
+      } else {
+        setError(data.message);
+      }
+    } catch (err) {
+      console.error("Login error:", err);
+      setError("Server error. Try again.");
     }
-    // --- END HARDCODED AUTH CHECK ---
 
     setLoading(false);
   };
@@ -33,11 +46,11 @@ const LoginView = ({ onNavigate, onLoginSuccess }) => {
     <div className="flex justify-center items-center p-6 min-h-[60vh]">
       <div className="w-full max-w-md bg-indigo-700 text-white p-10 rounded-xl shadow-2xl">
         <h2 className="text-3xl font-bold mb-8 text-center">Login</h2>
-
         <form onSubmit={handleLogin} className="space-y-6">
-          {/* Username/Email Input */}
           <div>
-            <label htmlFor="login-email" className="block text-lg font-medium mb-2">Username/Email:</label>
+            <label htmlFor="login-email" className="block text-lg font-medium mb-2">
+              Username/Email:
+            </label>
             <input
               id="login-email"
               type="email"
@@ -48,10 +61,10 @@ const LoginView = ({ onNavigate, onLoginSuccess }) => {
               required
             />
           </div>
-          
-          {/* Password Input */}
           <div>
-            <label htmlFor="login-password" className="block text-lg font-medium mb-2">Password:</label>
+            <label htmlFor="login-password" className="block text-lg font-medium mb-2">
+              Password:
+            </label>
             <input
               id="login-password"
               type="password"
@@ -62,7 +75,6 @@ const LoginView = ({ onNavigate, onLoginSuccess }) => {
               required
             />
           </div>
-
           <div className="flex justify-between items-center text-sm">
             <button
               type="button"
@@ -79,19 +91,11 @@ const LoginView = ({ onNavigate, onLoginSuccess }) => {
               {loading ? 'Logging in...' : 'Login'}
             </button>
           </div>
-
-          {error && (
-            <p className="text-red-300 text-center pt-2">{error}</p>
-          )}
-
-          <p className="text-center text-sm pt-2 text-indigo-200">
-            (Hint: Use email: **test@example.com**, password: **password**)
-          </p>
-
+          {error && <p className="text-red-300 text-center pt-2">{error}</p>}
         </form>
-        
         <div className="text-center mt-6">
-          <p>New member? 
+          <p>
+            New member? 
             <button 
               onClick={() => onNavigate('Signup')}
               className="text-white font-semibold underline ml-1 hover:text-indigo-200 transition duration-150"
