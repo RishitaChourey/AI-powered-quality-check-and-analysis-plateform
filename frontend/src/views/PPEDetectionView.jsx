@@ -30,8 +30,12 @@ const PPEDetectionView = () => {
 
       const data = res.data;
       setDetections(data.detections || []);
-      setOriginalMedia(`http://127.0.0.1:8000${data.original_media}`);
-      setAnnotatedMedia(`http://127.0.0.1:8000${data.annotated_media}`);
+      if (data.original_image) {
+        setOriginalMedia(`http://127.0.0.1:8000${data.original_image}`);
+      }
+      if (data.annotated_image) {
+        setAnnotatedMedia(`http://127.0.0.1:8000${data.annotated_image}`);
+      }
     } catch (err) {
       console.error("Prediction error:", err);
       alert("Something went wrong while detecting PPE.");
