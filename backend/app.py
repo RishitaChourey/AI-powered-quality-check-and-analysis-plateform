@@ -18,7 +18,7 @@ app.add_middleware(
     allow_headers=["*", "Range"],
 )
 
-model = YOLO("best.pt")
+model = YOLO("best(3).pt")
 
 # Mount static directories
 app.mount("/static", StaticFiles(directory="static"), name="static")
@@ -64,6 +64,7 @@ async def predict(file: UploadFile = File(...)):
         results = model.predict(
             source=upload_path,
             save=True,
+            conf=0.60,
             project="static",
             name="detections",
             exist_ok=True
