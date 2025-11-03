@@ -49,7 +49,7 @@ async def load_model():
 # SQLite DB Setup for Users
 DB_FILE = "users.db"
 if not os.path.exists(DB_FILE):
-    conn = sqlite3.connect(DB_FILE)
+    conn = sqlite3.connect(DB_FILE, check_same_thread=False, timeout=10)
     c = conn.cursor()
     c.execute('''
         CREATE TABLE users (
@@ -74,7 +74,7 @@ class User(BaseModel):
 @app.post("/api/signup")
 async def signup(user: User):
     try:
-        conn = sqlite3.connect(DB_FILE)
+        conn = sqlite3.connect(DB_FILE, check_same_thread=False, timeout=10)
         c = conn.cursor()
         c.execute("INSERT INTO users (name, email, password) VALUES (?, ?, ?)",
                   (user.name, user.email, user.password))
@@ -91,7 +91,7 @@ async def signup(user: User):
 @app.post("/api/login")
 async def login(user: User):
     try:
-        conn = sqlite3.connect(DB_FILE)
+        conn = sqlite3.connect(DB_FILE, check_same_thread=False, timeout=10)
         c = conn.cursor()
         c.execute("SELECT * FROM users WHERE email=? AND password=?", (user.email, user.password))
         row = c.fetchone()
