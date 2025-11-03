@@ -3,12 +3,13 @@ import sqlite3
 DB_PATH = 'users.db'
 
 def ensure_table():
+    """Ensure the users table exists with correct columns."""
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS users (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
-            username TEXT UNIQUE,
+            name TEXT,
             email TEXT UNIQUE,
             password TEXT
         )
@@ -16,32 +17,46 @@ def ensure_table():
     conn.commit()
     conn.close()
 
-def register_user(username, email, password):
+def register_user(name, email, password):
+    """
+    Register a new user.
+    Returns (True, message) if success, (False, message) if failure.
+    """
     ensure_table()
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
     try:
-        cursor.execute('INSERT INTO users (username, email, password) VALUES (?, ?, ?)',
-                       (username, email, password))
+        cursor.execute(
+            'INSERT INTO users (name, email, password) VALUES (?, ?, ?)',
+            (name, email, password)
+        )
         conn.commit()
         return True, "User registered successfully."
     except sqlite3.IntegrityError:
-        return False, "Username or email already exists."
+        return False, "Email already exists."
     finally:
         conn.close()
 
 def check_login(email, password):
+    """
+    Check login credentials.
+    Returns (True, message) if login successful, (False, message) if failed.
+    """
     ensure_table()
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
-    cursor.execute('SELECT id, username, email, password FROM users WHERE email = ?', (email,))
+    cursor.execute(
+        'SELECT id, name, email, password FROM users WHERE email = ?',
+        (email,)
+    )
     user = cursor.fetchone()
     conn.close()
 
     if not user:
         return False, "User does not exist. Please sign up first."
     
-    if user[3] == password:  # index 3 = password
+    user_id, name, email, db_password = user
+    if db_password == password:
         return True, "Login successful."
     else:
         return False, "Incorrect password."
