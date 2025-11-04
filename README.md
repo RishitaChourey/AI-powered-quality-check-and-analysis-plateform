@@ -63,7 +63,7 @@ python login.py
 You can log in using these credentials:
 ```bash
 Email: a@gmail.com  
-Password: password
+Password: 123456
 ```
 
 💻 2️⃣ Run the Frontend (Terminal 3)
