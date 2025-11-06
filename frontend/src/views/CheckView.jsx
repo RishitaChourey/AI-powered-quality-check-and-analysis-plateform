@@ -70,7 +70,7 @@ const CheckView = ({ checkType }) => {
     emailjs
       .send(
         "service_4ku5fmq",       // replace with your EmailJS service ID
-        "template_ppe",          // PPE template ID
+        "template_tx1k3b5",          // PPE template ID
         { title: message },      // template variable
         "M3qxulbWtcwpbhfQS"     // replace with your EmailJS public key
       )
