@@ -11,17 +11,13 @@ import DashboardView from './views/DashboardView';
 import NotificationsView from './views/NotificationsView';
 import CheckView from './views/CheckView';
 import AboutView from './views/AboutView';
+import PPEDetectionView from './views/PPEDetectionView';
 
 // Authentication Views
 import LoginView from './views/LoginView';
 import SignupView from './views/SignupView';
 import ForgotPasswordView from './views/ForgotPasswordView';
-import HomeView from './views/HomeView';
-import PPEDetectionView from './views/PPEDetectionView';
-import CheckView from './views/CheckView';
-import DashboardView from './views/DashboardView';
-import NotificationsView from './views/NotificationsView';
-import AboutView from './views/AboutView';
+
 
 const App = () => {
   const [currentPage, setCurrentPage] = useState('Login');
@@ -112,7 +108,7 @@ const App = () => {
         break;
     }
   }
-
+  const isAuthView = ['Login', 'Signup', 'ForgotPassword'].includes(currentPage);
   return (
     <div className="min-h-screen bg-gray-50 font-sans">
       <Header
