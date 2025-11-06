@@ -36,6 +36,8 @@ static/
 uploads/
 backend/static/
 backend/uploads/
+backend/yolov12/
+
 
 # 🔹 Logs and temporary files
 *.log
