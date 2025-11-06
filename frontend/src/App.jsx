@@ -16,6 +16,12 @@ import AboutView from './views/AboutView';
 import LoginView from './views/LoginView';
 import SignupView from './views/SignupView';
 import ForgotPasswordView from './views/ForgotPasswordView';
+import HomeView from './views/HomeView';
+import PPEDetectionView from './views/PPEDetectionView';
+import CheckView from './views/CheckView';
+import DashboardView from './views/DashboardView';
+import NotificationsView from './views/NotificationsView';
+import AboutView from './views/AboutView';
 
 const App = () => {
   const [currentPage, setCurrentPage] = useState('Login');
@@ -42,18 +48,26 @@ const App = () => {
       return;
     }
     setCurrentPage(page);
-    if (page !== 'CheckPage') setCheckType(null);
+    if (page !== 'CheckPage') {
+      setCheckType(null);
+    }
   };
 
+  // Handle selection of different check types
   const handleSelectCheck = (type) => {
-    setCheckType(type);
-    setCurrentPage('CheckPage');
+    if (type === 'PPE') {
+      setCurrentPage('PPE'); // Go to PPEDetectionView
+    } else {
+      setCheckType(type);
+      setCurrentPage('CheckPage');
+    }
   };
 
-  // --- Render content based on current page ---
+  // --- Render Content based on Auth State and Page ---
   let content;
 
   if (!isLoggedIn || ['Login', 'Signup', 'ForgotPassword', 'About'].includes(currentPage)) {
+    // Public or Auth views
     switch (currentPage) {
       case 'Signup':
         content = <SignupView onNavigate={handleNavigate} />;
@@ -66,10 +80,16 @@ const App = () => {
         break;
       case 'Login':
       default:
-        content = <LoginView onNavigate={handleNavigate} onLoginSuccess={handleLoginSuccess} />;
+        content = (
+          <LoginView
+            onNavigate={handleNavigate}
+            onLoginSuccess={handleLoginSuccess}
+          />
+        );
         break;
     }
   } else {
+    // Authenticated views
     switch (currentPage) {
       case 'Dashboard':
         content = <DashboardView />;
@@ -83,14 +103,15 @@ const App = () => {
       case 'About':
         content = <AboutView onNavigate={handleNavigate} />;
         break;
+      case 'PPE':
+        content = <PPEDetectionView />;
+        break;
       case 'Home':
       default:
         content = <HomeView onSelectCheck={handleSelectCheck} />;
         break;
     }
   }
-
-  const isAuthView = ['Login', 'Signup', 'ForgotPassword'].includes(currentPage);
 
   return (
     <div className="min-h-screen bg-gray-50 font-sans">
