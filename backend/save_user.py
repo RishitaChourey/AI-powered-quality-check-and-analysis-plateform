@@ -1,10 +1,10 @@
 import sqlite3
 
-DB_PATH = 'users.db'
+DB_FILE = 'users.db'
 
 def ensure_table():
     """Ensure the users table exists with correct columns."""
-    conn = sqlite3.connect(DB_PATH)
+    conn = sqlite3.connect(DB_FILE, check_same_thread=False, timeout=10)
     cursor = conn.cursor()
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS users (
@@ -23,7 +23,7 @@ def register_user(name, email, password):
     Returns (True, message) if success, (False, message) if failure.
     """
     ensure_table()
-    conn = sqlite3.connect(DB_PATH)
+    conn = sqlite3.connect(DB_FILE, check_same_thread=False, timeout=10)
     cursor = conn.cursor()
     try:
         cursor.execute(
@@ -43,7 +43,7 @@ def check_login(email, password):
     Returns (True, message) if login successful, (False, message) if failed.
     """
     ensure_table()
-    conn = sqlite3.connect(DB_PATH)
+    conn = sqlite3.connect(DB_FILE, check_same_thread=False, timeout=10)
     cursor = conn.cursor()
     cursor.execute(
         'SELECT id, name, email, password FROM users WHERE email = ?',

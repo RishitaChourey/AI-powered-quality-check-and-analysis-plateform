@@ -1,14 +1,24 @@
 from fastapi import FastAPI, File, UploadFile, HTTPException
 from fastapi.responses import StreamingResponse, JSONResponse
+from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from ultralytics import YOLO
 from PIL import Image
 import sqlite3
 import io
-import os
-import sys
-import shutil
+import shutil, os, glob, cv2, sys 
+from moviepy import VideoFileClip
+
+app = FastAPI()
+# Allow frontend access
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],   # Allow all origins during development
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*", "Range"],
+)
 
 # -------------------------------
 # Add YOLOv12 folder to path
@@ -49,7 +59,7 @@ async def load_model():
 # SQLite DB Setup for Users
 DB_FILE = "users.db"
 if not os.path.exists(DB_FILE):
-    conn = sqlite3.connect(DB_FILE)
+    conn = sqlite3.connect(DB_FILE, check_same_thread=False, timeout=10)
     c = conn.cursor()
     c.execute('''
         CREATE TABLE users (
@@ -74,7 +84,7 @@ class User(BaseModel):
 @app.post("/api/signup")
 async def signup(user: User):
     try:
-        conn = sqlite3.connect(DB_FILE)
+        conn = sqlite3.connect(DB_FILE, check_same_thread=False, timeout=10)
         c = conn.cursor()
         c.execute("INSERT INTO users (name, email, password) VALUES (?, ?, ?)",
                   (user.name, user.email, user.password))
@@ -91,7 +101,7 @@ async def signup(user: User):
 @app.post("/api/login")
 async def login(user: User):
     try:
-        conn = sqlite3.connect(DB_FILE)
+        conn = sqlite3.connect(DB_FILE, check_same_thread=False, timeout=10)
         c = conn.cursor()
         c.execute("SELECT * FROM users WHERE email=? AND password=?", (user.email, user.password))
         row = c.fetchone()
@@ -104,57 +114,88 @@ async def login(user: User):
     except Exception as e:
         return JSONResponse(content={"message": f"Server error: {e}"}, status_code=500)
 
-# -------------------------------
-# PPE Image Check Endpoint
-@app.post("/api/check_ppe_image/")
-async def check_ppe_image(file: UploadFile = File(...)):
-    if not file.content_type.startswith('image/'):
-        raise HTTPException(status_code=400, detail="File must be an image (JPEG, PNG).")
-    
-    if model is None:
-        raise HTTPException(status_code=503, detail="Model not initialized.")
+model = YOLO("best(3).pt")
 
-    content = await file.read()
-    image_stream = io.BytesIO(content)
-    temp_run_dir = os.path.join("temp_runs", os.urandom(8).hex())
+# Mount static directories
+app.mount("/static", StaticFiles(directory="static"), name="static")
 
-    try:
-        input_image = Image.open(image_stream).convert("RGB")
-        results = model.predict(
-            source=input_image,
-            save=True,
-            project="temp_runs",
-            name=os.urandom(8).hex(),
-            exist_ok=True,
-            verbose=False
+# Ensure directories exist
+os.makedirs("static/uploads", exist_ok=True)
+os.makedirs("static/detections", exist_ok=True)
+
+
+# 🔄 Convert YOLO .avi outputs to .mp4 (browser compatible)
+def convert_avi_to_mp4(input_path: str) -> str:
+    """Convert YOLO output .avi to .mp4 for browser playback using MoviePy."""
+    if not input_path.lower().endswith(".avi"):
+        return input_path  # already mp4 or other format
+
+    output_path = input_path.replace(".avi", ".mp4")
+
+    # Load and convert the video
+    with VideoFileClip(input_path) as clip:
+        clip.write_videofile(
+            output_path,
+            codec='libx264',       # widely supported for browsers
+            audio_codec='aac',     # ensure audio track compatibility
+            fps=clip.fps or 20     # preserve original or fallback fps
         )
 
-        if results and len(results) > 0:
-            result = results[0]
-            result_path = os.path.join(result.save_dir, result.path)
+    # Clean up original file
+    os.remove(input_path)
+    return output_path
 
-            if not os.path.exists(result_path):
-                raise FileNotFoundError(f"YOLO output not found: {result_path}")
+@app.post("/predict/")
+async def predict(file: UploadFile = File(...)):
+    try:
+        # Save uploaded file
+        upload_path = f"static/uploads/{file.filename}"
+        with open(upload_path, "wb") as buffer:
+            shutil.copyfileobj(file.file, buffer)
 
-            processed_image = Image.open(result_path)
-            output_stream = io.BytesIO()
-            processed_image.save(output_stream, format="JPEG", quality=90)
-            output_stream.seek(0)
+        # Detect if input is a video
+        is_video = file.content_type.startswith("video/")
 
-            return StreamingResponse(
-                output_stream,
-                media_type="image/jpeg",
-                headers={"Content-Disposition": f"attachment; filename=result_{file.filename}.jpeg"}
-            )
-        else:
-            raise HTTPException(status_code=500, detail="YOLO inference produced no results.")
+        # Run YOLO detection
+        results = model.predict(
+            source=upload_path,
+            save=True,
+            conf=0.60,
+            project="static",
+            name="detections",
+            exist_ok=True
+        )
+
+        # Extract detections
+        detections = []
+        for r in results:
+            for box in r.boxes:
+                detections.append({
+                    "class": model.names[int(box.cls)],
+                    "confidence": float(box.conf)
+                })
+
+        # Find annotated output file
+        base_name = os.path.splitext(file.filename)[0]
+        output_dir = "static/detections"
+        detected_files = glob.glob(f"{output_dir}/{base_name}*")
+        annotated_path = detected_files[0].replace("\\", "/") if detected_files else None
+
+        # Convert .avi to .mp4 if necessary
+        if annotated_path and annotated_path.endswith(".avi"):
+             annotated_path = convert_avi_to_mp4(annotated_path)
+
+
+        return JSONResponse({
+            "detections": detections,
+            "original_image": f"/static/uploads/{file.filename}",
+            "annotated_image": "/" + annotated_path if annotated_path else None,
+            "is_video": is_video
+        })
 
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"AI processing error: {e}")
-    finally:
-        if os.path.exists(temp_run_dir):
-            try:
-                shutil.rmtree(temp_run_dir)
-                print(f"INFO: Cleaned up temporary directory: {temp_run_dir}")
-            except OSError as e:
-                print(f"WARNING: Could not remove temp dir {temp_run_dir}: {e}")
+        return JSONResponse({"error": str(e)})
+
+@app.get("/")
+def root():
+    return {"message": "PPE detection API running!"}
