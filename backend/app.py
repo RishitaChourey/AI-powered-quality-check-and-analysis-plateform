@@ -9,6 +9,7 @@ import sqlite3
 import io
 import shutil, os, glob, cv2, sys 
 from moviepy import VideoFileClip
+from collections import Counter
 
 app = FastAPI()
 # Allow frontend access
@@ -38,22 +39,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-# -------------------------------
-# YOLOv12 Model
-MODEL_PATH = "weights/best.pt"
-model = None
-
-@app.on_event("startup")
-async def load_model():
-    global model
-    if not os.path.exists(MODEL_PATH):
-        raise RuntimeError(f"Model weights not found at {MODEL_PATH}.")
-    try:
-        model = YOLO(MODEL_PATH)
-        print(f"INFO: Successfully loaded custom YOLOv12 model from {MODEL_PATH}")
-    except Exception as e:
-        raise RuntimeError(f"YOLOv12 Load Error: {e}") from e
 
 # -------------------------------
 # SQLite DB Setup for Users
@@ -114,7 +99,7 @@ async def login(user: User):
     except Exception as e:
         return JSONResponse(content={"message": f"Server error: {e}"}, status_code=500)
 
-model = YOLO("best(3).pt")
+model = YOLO("weights/best(3).pt")
 
 # Mount static directories
 app.mount("/static", StaticFiles(directory="static"), name="static")
@@ -186,8 +171,11 @@ async def predict(file: UploadFile = File(...)):
              annotated_path = convert_avi_to_mp4(annotated_path)
 
 
+        summary = Counter([d["class"] for d in detections])
+
         return JSONResponse({
             "detections": detections,
+            "summary": summary,
             "original_image": f"/static/uploads/{file.filename}",
             "annotated_image": "/" + annotated_path if annotated_path else None,
             "is_video": is_video
