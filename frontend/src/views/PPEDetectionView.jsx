@@ -1,6 +1,7 @@
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import axios from "axios";
 import Webcam from "react-webcam";
+import emailjs from "@emailjs/browser";
 
 const PPEDetectionView = () => {
   const [file, setFile] = useState(null);
@@ -24,7 +25,6 @@ const PPEDetectionView = () => {
     const imageSrc = webcamRef.current.getScreenshot();
     if (!imageSrc) return alert("Unable to capture from webcam.");
 
-    // Convert base64 image to File object
     fetch(imageSrc)
       .then((res) => res.blob())
       .then((blob) => {
@@ -45,7 +45,7 @@ const PPEDetectionView = () => {
 
     try {
       setLoading(true);
-      setProgress(30); // Initial progress state
+      setProgress(30);
 
       const res = await axios.post("http://127.0.0.1:8000/predict/", formData, {
         headers: { "Content-Type": "multipart/form-data" },
@@ -57,7 +57,7 @@ const PPEDetectionView = () => {
         },
       });
 
-      setProgress(90); // Close to completion
+      setProgress(90);
 
       const data = res.data;
       setDetections(data.detections || []);
@@ -77,6 +77,33 @@ const PPEDetectionView = () => {
       setLoading(false);
       setTimeout(() => setProgress(0), 800);
     }
+  };
+
+  // ✅ Automatically send PPE alert email when detections are found
+  useEffect(() => {
+    if (detections.length > 0) {
+      sendPPEEmail();
+    }
+  }, [detections]);
+
+  const sendPPEEmail = () => {
+    const totalViolations = detections.length;
+    const summaryText = Object.entries(summary)
+      .map(([cls, count]) => `${cls}: ${count}`)
+      .join(", ");
+
+    emailjs
+      .send(
+        "service_4ku5fmq", // your service ID
+        "template_tx1k3b5", // your template ID
+        {
+          title: "⚠️ PPE Violation Alert",
+          message: `Detected ${totalViolations} PPE issues.\nSummary: ${summaryText}`,
+        },
+        "M3qxulbWtcwpbhfQS" // your public key
+      )
+      .then(() => console.log("✅ PPE email sent successfully"))
+      .catch((err) => console.error("❌ Failed to send PPE email:", err));
   };
 
   return (
@@ -184,7 +211,9 @@ const PPEDetectionView = () => {
 
           {Object.keys(summary).length > 0 && (
             <div className="mt-4">
-              <h4 className="text-lg font-semibold text-gray-800 mb-2">Summary</h4>
+              <h4 className="text-lg font-semibold text-gray-800 mb-2">
+                Summary
+              </h4>
               <ul className="grid grid-cols-2 md:grid-cols-3 gap-2">
                 {Object.entries(summary).map(([cls, count]) => (
                   <li key={cls} className="bg-gray-100 px-3 py-1 rounded">
@@ -199,7 +228,6 @@ const PPEDetectionView = () => {
           )}
         </div>
       )}
-
 
       {(originalMedia || annotatedMedia) && (
         <div className="mt-10 grid grid-cols-1 md:grid-cols-2 gap-6 w-full max-w-5xl">
