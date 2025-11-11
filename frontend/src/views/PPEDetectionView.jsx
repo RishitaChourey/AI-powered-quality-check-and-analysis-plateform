@@ -1,7 +1,9 @@
 import React, { useState, useRef, useEffect } from "react";
 import axios from "axios";
 import Webcam from "react-webcam";
-import emailjs from "@emailjs/browser";
+
+const PPE_API = "http://127.0.0.1:8000/predict/";
+const EMAIL_API = "http://127.0.0.1:8000/send_email/";
 
 const PPEDetectionView = () => {
   const [file, setFile] = useState(null);
@@ -47,7 +49,7 @@ const PPEDetectionView = () => {
       setLoading(true);
       setProgress(30);
 
-      const res = await axios.post("http://127.0.0.1:8000/predict/", formData, {
+      const res = await axios.post(PPE_API, formData, {
         headers: { "Content-Type": "multipart/form-data" },
         onUploadProgress: (progressEvent) => {
           const percent = Math.round(
@@ -79,31 +81,47 @@ const PPEDetectionView = () => {
     }
   };
 
-  // ✅ Automatically send PPE alert email when detections are found
+  // Automatically send PPE alert email when detections are found
   useEffect(() => {
     if (detections.length > 0) {
       sendPPEEmail();
     }
   }, [detections]);
 
-  const sendPPEEmail = () => {
-    const totalViolations = detections.length;
-    const summaryText = Object.entries(summary)
-      .map(([cls, count]) => `${cls}: ${count}`)
-      .join(", ");
+  // Send PPE violation email via FastAPI backend
+  const sendPPEEmail = async () => {
+    try {
+      const totalViolations = detections.length;
+      const summaryText = Object.entries(summary)
+        .map(([cls, count]) => `${cls}: ${count}`)
+        .join(", ");
 
-    emailjs
-      .send(
-        "service_4ku5fmq", // your service ID
-        "template_tx1k3b5", // your template ID
-        {
-          title: "⚠️ PPE Violation Alert",
-          message: `Detected ${totalViolations} PPE issues.\nSummary: ${summaryText}`,
-        },
-        "M3qxulbWtcwpbhfQS" // your public key
-      )
-      .then(() => console.log("✅ PPE email sent successfully"))
-      .catch((err) => console.error("❌ Failed to send PPE email:", err));
+      const subject = "⚠️ PPE Violation Alert";
+      const body = `
+        <p>Dear Employee,</p>
+        <p>This is to formally notify you that during a recent safety inspection, it was observed that you were not wearing the required Personal Protective Equipment (PPE), specifically ${summaryText}.</p>
+        <p>Safety in the workplace is of utmost importance, and compliance with PPE guidelines is mandatory for your protection and the safety of others.</p>
+        <p>Please consider this a formal warning. Any future violations may result in further disciplinary action as per company safety policies.</p>
+        <p>You are required to immediately ensure full compliance with all PPE requirements at all times while on site.</p>
+        <p>Thank you for your attention and cooperation.</p>
+        <br>
+        <p>Sincerely,<br>TEIM</p>
+      `;
+
+      await fetch(EMAIL_API, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          to: ["industryproject87@gmail.com"], 
+          subject,
+          body,
+        }),
+      });
+
+      console.log("✅ PPE email sent successfully via FastAPI backend");
+    } catch (error) {
+      console.error("❌ Error sending PPE email:", error);
+    }
   };
 
   return (

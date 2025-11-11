@@ -1,10 +1,8 @@
-// src/views/CheckView.jsx
-
 import React, { useState } from "react";
 import { Camera } from "lucide-react";
-import emailjs from "@emailjs/browser";
 
 const PPE_API = "http://127.0.0.1:8000/api/check_ppe_image/";
+const EMAIL_API = "http://127.0.0.1:8000/send_email/";
 
 const CheckView = () => {
   const [selectedFile, setSelectedFile] = useState(null);
@@ -12,25 +10,7 @@ const CheckView = () => {
   const [ppeViolations, setPpeViolations] = useState([]);
   const [loading, setLoading] = useState(false);
 
-  // ✅ Automatically send email if violations are found
-  const sendPPEEmail = async (violations) => {
-    try {
-      await emailjs.send(
-        "service_4ku5fmq", // ✅ Your EmailJS service ID
-        "template_tx1k3b5", // ✅ Your template ID
-        {
-          message: `PPE Violations Detected: ${violations.join(", ")}`,
-          to_email: "recipient@example.com", // change to recipient email
-        },
-        "M3qxulbWtcwpbhfQS" // ✅ Your EmailJS public key
-      );
-      console.log("✅ PPE Warning Email Sent Automatically!");
-    } catch (error) {
-      console.error("❌ Error Sending PPE Email:", error);
-    }
-  };
-
-  // ✅ Upload and detect PPE
+  // Upload and detect PPE
   const handleUpload = async () => {
     if (!selectedFile) {
       alert("Please select a file first!");
@@ -52,9 +32,30 @@ const CheckView = () => {
       setProcessedVideo(data.processed_video || null);
       setPpeViolations(data.violations || []);
 
-      // Send email automatically
+      // Send email automatically via FastAPI if violations found
       if (data.violations && data.violations.length > 0) {
-        await sendPPEEmail(data.violations);
+        try {
+          await fetch(EMAIL_API, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              to: ["industryproject87@gmail.com"], 
+              subject: "PPE Violation Detected",
+              body: `
+                <p>Dear Employee,</p>
+                <p>The following PPE violations were detected: 
+                <strong>${data.violations.join(", ")}</strong>.</p>
+                <p>Please ensure compliance with all safety protocols.</p>
+                <p>Regards,<br><b>TEIM Safety System</b></p>
+              `,
+            }),
+          });
+          console.log("✅ PPE Violation Email sent via FastAPI");
+        } catch (err) {
+          console.error("❌ Failed to send email via FastAPI:", err);
+        }
       }
     } catch (error) {
       console.error("Error while checking PPE:", error);

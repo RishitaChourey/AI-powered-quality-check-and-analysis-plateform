@@ -1,4 +1,4 @@
-from fastapi import FastAPI, File, UploadFile, HTTPException
+from fastapi import FastAPI, File, UploadFile, HTTPException, BackgroundTasks
 from fastapi.responses import StreamingResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
@@ -10,9 +10,9 @@ import io
 import shutil, os, glob, cv2, sys 
 from moviepy import VideoFileClip
 from collections import Counter
+from email_utils import send_detection_email, DetectionEmail
 
 app = FastAPI()
-# Allow frontend access
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],   # Allow all origins during development
@@ -21,15 +21,12 @@ app.add_middleware(
     allow_headers=["*", "Range"],
 )
 
-# -------------------------------
 # Add YOLOv12 folder to path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'yolov12'))
 
-# -------------------------------
 # FastAPI App
 app = FastAPI(title="PPE Detection + Auth API", version="1.0")
 
-# -------------------------------
 # CORS
 origins = ["*", "http://localhost:3000", "http://127.0.0.1:8000"]
 app.add_middleware(
@@ -40,7 +37,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# -------------------------------
 # SQLite DB Setup for Users
 DB_FILE = "users.db"
 if not os.path.exists(DB_FILE):
@@ -57,14 +53,12 @@ if not os.path.exists(DB_FILE):
     conn.commit()
     conn.close()
 
-# -------------------------------
 # User Model
 class User(BaseModel):
     name: str = None
     email: str
     password: str
 
-# -------------------------------
 # Signup Route
 @app.post("/api/signup")
 async def signup(user: User):
@@ -81,7 +75,6 @@ async def signup(user: User):
     except Exception as e:
         return JSONResponse(content={"message": f"Server error: {e}"}, status_code=500)
 
-# -------------------------------
 # Login Route
 @app.post("/api/login")
 async def login(user: User):
@@ -108,8 +101,7 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 os.makedirs("static/uploads", exist_ok=True)
 os.makedirs("static/detections", exist_ok=True)
 
-
-# 🔄 Convert YOLO .avi outputs to .mp4 (browser compatible)
+# Convert YOLO .avi outputs to .mp4 (browser compatible)
 def convert_avi_to_mp4(input_path: str) -> str:
     """Convert YOLO output .avi to .mp4 for browser playback using MoviePy."""
     if not input_path.lower().endswith(".avi"):
@@ -187,3 +179,14 @@ async def predict(file: UploadFile = File(...)):
 @app.get("/")
 def root():
     return {"message": "PPE detection API running!"}
+
+@app.post("/send_email/")
+async def send_email(background_tasks: BackgroundTasks, email:
+    DetectionEmail):
+    background_tasks.add_task(
+        send_detection_email,
+        email.to,
+        email.subject,
+        email.body
+    )
+    return {"message": "Email will be sent in the background"}
