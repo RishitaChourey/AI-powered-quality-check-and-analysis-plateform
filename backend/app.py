@@ -183,6 +183,113 @@ async def predict(file: UploadFile = File(...)):
 
     except Exception as e:
         return JSONResponse({"error": str(e)})
+# --- Load separate YOLO model for Machine Quality Assurance ---
+machine_model = YOLO("weights/best (4).pt")
+
+@app.post("/predict_machine/")
+async def predict_machine(file: UploadFile = File(...)):
+    try:
+        # Save uploaded file
+        upload_path = f"static/uploads/{file.filename}"
+        with open(upload_path, "wb") as buffer:
+            shutil.copyfileobj(file.file, buffer)
+
+        is_video = file.content_type.startswith("video/")
+        detections = []
+
+        if is_video:
+            # ----------------------------
+            # Process VIDEO with frame skipping
+            # ----------------------------
+            skip_frames = 10  # Change to 10 if you want higher skip (less processing)
+            cap = cv2.VideoCapture(upload_path)
+            total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+            fps = int(cap.get(cv2.CAP_PROP_FPS)) or 20
+
+            # Output path
+            output_dir = "static/machine_detections"
+            os.makedirs(output_dir, exist_ok=True)
+            base_name = os.path.splitext(file.filename)[0]
+            output_path = os.path.join(output_dir, f"{base_name}_annotated.mp4")
+
+            # Video writer setup
+            fourcc = cv2.VideoWriter_fourcc(*"mp4v")
+            width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+            height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+            out = cv2.VideoWriter(output_path, fourcc, fps, (width, height))
+
+            frame_idx = 0
+            annotated_frames = {}
+
+            while cap.isOpened():
+                ret, frame = cap.read()
+                if not ret:
+                    break
+
+                # Process only every nth frame
+                if frame_idx % skip_frames == 0:
+                    results = machine_model.predict(frame, conf=0.6, verbose=False)
+                    r = results[0]
+
+                    # Draw boxes for this frame
+                    for box in r.boxes:
+                        cls_name = machine_model.names[int(box.cls)]
+                        conf_val = float(box.conf)
+                        detections.append({"class": cls_name, "confidence": conf_val})
+
+                    annotated_frame = r.plot()
+                    annotated_frames[frame_idx] = annotated_frame
+
+                # If frame was processed → use annotated version, else reuse last annotated frame
+                frame_to_write = annotated_frames.get(frame_idx, frame)
+                out.write(frame_to_write)
+
+                frame_idx += 1
+
+            cap.release()
+            out.release()
+
+            annotated_path = output_path.replace("\\", "/")
+
+        else:
+            # ----------------------------
+            # Process IMAGE normally
+            # ----------------------------
+            results = machine_model.predict(
+                source=upload_path,
+                save=True,
+                conf=0.60,
+                project="static",
+                name="machine_detections",
+                exist_ok=True
+            )
+
+            for r in results:
+                for box in r.boxes:
+                    detections.append({
+                        "class": machine_model.names[int(box.cls)],
+                        "confidence": float(box.conf)
+                    })
+
+            # Find annotated image
+            base_name = os.path.splitext(file.filename)[0]
+            output_dir = "static/machine_detections"
+            detected_files = glob.glob(f"{output_dir}/{base_name}*")
+            annotated_path = detected_files[0].replace("\\", "/") if detected_files else None
+
+        # Summary counts
+        summary = Counter([d["class"] for d in detections])
+
+        return JSONResponse({
+            "detections": detections,
+            "summary": summary,
+            "original_image": f"/static/uploads/{file.filename}",
+            "annotated_image": "/" + annotated_path if annotated_path else None,
+            "is_video": is_video
+        })
+
+    except Exception as e:
+        return JSONResponse({"error": str(e)})
 
 @app.get("/")
 def root():

@@ -12,6 +12,7 @@ import NotificationsView from './views/NotificationsView';
 import CheckView from './views/CheckView';
 import AboutView from './views/AboutView';
 import PPEDetectionView from './views/PPEDetectionView';
+import MachineQualityView from './views/MachineQualityView';
 
 // Authentication Views
 import LoginView from './views/LoginView';
@@ -53,7 +54,10 @@ const App = () => {
   const handleSelectCheck = (type) => {
     if (type === 'PPE') {
       setCurrentPage('PPE'); // Go to PPEDetectionView
-    } else {
+    } else if (type === 'Machine') {
+    setCurrentPage('Machine'); 
+  }
+     else {
       setCheckType(type);
       setCurrentPage('CheckPage');
     }
@@ -101,6 +105,9 @@ const App = () => {
         break;
       case 'PPE':
         content = <PPEDetectionView />;
+        break;
+      case 'Machine':
+        content = <MachineQualityView />;
         break;
       case 'Home':
       default:
