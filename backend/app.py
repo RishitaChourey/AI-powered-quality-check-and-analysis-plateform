@@ -101,6 +101,7 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 os.makedirs("static/uploads", exist_ok=True)
 os.makedirs("static/detections", exist_ok=True)
 
+
 # Convert YOLO .avi outputs to .mp4 (browser compatible)
 def convert_avi_to_mp4(input_path: str) -> str:
     """Convert YOLO output .avi to .mp4 for browser playback using MoviePy."""
