@@ -1,12 +1,11 @@
 🚀 Phase 1: Clone the Repository
 
-Open a terminal and run this exact command:
+Open a terminal and run :
 
 ```bash
-git clone --recurse-submodules https://github.com/RishitaChourey/AI-powered-quality-check-and-analysis-plateform.git
+git clone https://github.com/RishitaChourey/AI-powered-quality-check-and-analysis-plateform.git
 cd AI-powered-quality-check-and-analysis-plateform
 ```
-🔹 The --recurse-submodules flag ensures the YOLOv12 model folder is also cloned properly.
 
 ⚙️ Phase 2: Python Environment and Dependencies
 This phase installs all standard libraries and links the custom YOLOv12 submodule to the Python path.
@@ -29,12 +28,7 @@ Make sure you have a requirements.txt file in the backend folder.
 ```bash
 pip install -r requirements.txt
 ```
-4️⃣ Install the Custom YOLOv12 Code (Crucial Step)
-This ensures Python can correctly find imports from the YOLOv12 submodule (e.g., AAttn and custom layers).
 
-```bash
-pip install -e ./yolov12
-```
 ▶️ Phase 3: Run the Application
 🧠 1️⃣ Start the Backend API (Terminal 1)
 Ensure your model weights (e.g., weights/best.pt) are present inside the backend directory.
@@ -78,21 +72,3 @@ npm start
 ```bash
 http://localhost:3000
 ```
-🧩 Folder Structure
-```bash
-AI-powered-quality-check-and-analysis-plateform/
-│
-├── backend/
-│   ├── app.py
-│   ├── requirements.txt
-│   ├── yolov12/              # Custom YOLOv12 model (submodule)
-│   └── weights/              # Model weights (best.pt, etc.)
-│
-├── frontend/
-│   ├── src/
-│   ├── public/
-│   ├── package.json
-│   └── ...
-│
-├── .gitmodules
-└── README.md
