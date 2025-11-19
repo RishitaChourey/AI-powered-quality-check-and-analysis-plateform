@@ -10,6 +10,11 @@ import io
 import shutil, os, glob, cv2, sys 
 from moviepy import VideoFileClip
 from collections import Counter
+from supabase_client import supabase
+from supabase import create_client
+from dotenv import load_dotenv
+
+load_dotenv()
 
 app = FastAPI()
 # Allow frontend access
@@ -187,3 +192,28 @@ async def predict(file: UploadFile = File(...)):
 @app.get("/")
 def root():
     return {"message": "PPE detection API running!"}
+
+@app.get("/test_db") 
+def test_db():
+    try: 
+        response = supabase.table("alert_logs").select("*").limit(2).execute() 
+        return {"status": "success", "data": response.data} 
+    except Exception as e: 
+        return {"status": "error", "message": str(e)}
+    
+SUPABASE_URL = os.getenv("SUPABASE_URL")
+SUPABASE_SERVICE_KEY = os.getenv("SUPABASE_SERVICE_KEY")
+supabase = create_client(SUPABASE_URL, SUPABASE_SERVICE_KEY)
+
+@app.get("/list_tables")
+def list_tables():
+    try:
+        # Query system catalog to get all public tables
+        response = supabase.rpc(
+            "get_tables",  # We'll create this function below
+            {}
+        ).execute()
+        return {"tables": response.data}
+    except Exception as e:
+        return {"error": str(e)}
+
