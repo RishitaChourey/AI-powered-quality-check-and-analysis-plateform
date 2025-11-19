@@ -9,3 +9,6 @@ huggingface-hub
 opencv-python 
 supervision 
 reportlab 
+flask_cors
+flask
+moviepy
