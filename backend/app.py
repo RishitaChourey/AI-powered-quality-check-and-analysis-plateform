@@ -1,4 +1,4 @@
-from fastapi import FastAPI, File, UploadFile, HTTPException
+from fastapi import FastAPI, File, UploadFile, HTTPException, BackgroundTasks
 from fastapi.responses import StreamingResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
@@ -10,6 +10,7 @@ import io
 import shutil, os, glob, cv2, sys 
 from moviepy import VideoFileClip
 from collections import Counter
+from email_utils import send_detection_email, DetectionEmail
 
 app = FastAPI()
 # Allow frontend access
@@ -187,3 +188,14 @@ async def predict(file: UploadFile = File(...)):
 @app.get("/")
 def root():
     return {"message": "PPE detection API running!"}
+
+@app.post("/send_email/")
+async def send_email(background_tasks: BackgroundTasks, email:
+    DetectionEmail):
+    background_tasks.add_task(
+        send_detection_email,
+        email.to,
+        email.subject,
+        email.body
+    )
+    return {"message": "Email will be sent in the background"}

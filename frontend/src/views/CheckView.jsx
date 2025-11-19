@@ -2,9 +2,9 @@
 
 import React, { useState, useEffect } from 'react';
 import { Camera, Image as ImageIcon, Download, Mail } from 'lucide-react'; 
-import emailjs from '@emailjs/browser'; // EmailJS import
 
-const API_ENDPOINT = 'http://127.0.0.1:8000/api/check_ppe_image/'; // YOLO API
+const PPE_API = 'http://127.0.0.1:8000/api/check_ppe_image/'; // YOLO API
+const EMAIL_API = "http://127.0.0.1:8000/send_email/";
 
 const CheckView = ({ checkType }) => {
   const [selectedFile, setSelectedFile] = useState(null);
@@ -12,104 +12,81 @@ const CheckView = ({ checkType }) => {
   const [processedImageUrl, setProcessedImageUrl] = useState(null);
   const [error, setError] = useState(null);
   const [previewUrl, setPreviewUrl] = useState(null);
+  const [ppeViolations, setPpeViolations] = useState([]);
+
 
   // --- File selection ---
   const handleFileChange = (event) => {
     const file = event.target.files[0];
     setSelectedFile(file);
-    setProcessedImageUrl(null);
-    setError(null);
     setPreviewUrl(file ? URL.createObjectURL(file) : null);
+    setProcessedImageUrl(null);
+    setPpeViolations([]);
+    setError(null);
   };
 
   // --- Upload to YOLO API ---
   const handleUpload = async (e) => {
     e.preventDefault();
     if (!selectedFile) {
-      setError("Please select an image file to upload.");
+      setError("Please select a file.");
       return;
     }
 
-    if (processedImageUrl) URL.revokeObjectURL(processedImageUrl);
-
     setLoading(true);
     setError(null);
-    setProcessedImageUrl(null);
 
     const formData = new FormData();
     formData.append('file', selectedFile);
 
     try {
-      const response = await fetch(API_ENDPOINT, { method: 'POST', body: formData });
-      if (response.ok) {
-        const imageBlob = await response.blob();
-        setProcessedImageUrl(URL.createObjectURL(imageBlob));
-      } else {
-        const errorText = await response.text();
-        let errorMessage = `Server responded with status ${response.status}.`;
-        try {
-          const errorData = JSON.parse(errorText);
-          errorMessage = errorData.detail || errorData.message || errorMessage;
-        } catch (e) {
-          console.error('Non-JSON error response:', errorText);
+      const response = await fetch(PPE_API, {
+        method: "POST",
+        body: formData,
+      });
+
+      const contentType = response.headers.get("content-type");
+
+      if (contentType && contentType.includes("application/json")) {
+        const data = await response.json();
+
+        // Save detections
+        setPpeViolations(data.violations || []);
+        setProcessedImageUrl(data.processed_video || null);
+
+        // Auto-email FASTAPI (like old code)
+        if (data.violations?.length > 0) {
+          await fetch(EMAIL_API, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              to: ["industryproject87@gmail.com"],
+              subject: "PPE Violation Detected",
+              body: `
+                <p>Dear Employee,</p>
+                <p>The following PPE violations were detected:
+                <strong>${data.violations.join(", ")}</strong>.</p>
+                <p>Please ensure compliance immediately.</p>
+                <p>Regards,<br><b>TEIM Safety System</b></p>
+              `,
+            }),
+          });
         }
-        setError(errorMessage);
+      } else {
+        // Image output (blob)
+        const blob = await response.blob();
+        setProcessedImageUrl(URL.createObjectURL(blob));
       }
     } catch (err) {
-      console.error('Upload Error:', err);
-      setError("Network error: Could not connect to the backend server.");
-    } finally {
-      setLoading(false);
+      console.error(err);
+      setError("Error connecting to backend.");
     }
+
+    setLoading(false);
   };
 
-  // --- Send Email for PPE ---
-  const handleSendPPEEmail = () => {
-    const message = "PPE has been checked for the selected image.";
-
-    emailjs
-      .send(
-        "service_4ku5fmq",       // replace with your EmailJS service ID
-        "template_ppe",          // PPE template ID
-        { title: message },      // template variable
-        "M3qxulbWtcwpbhfQS"     // replace with your EmailJS public key
-      )
-      .then(
-        (response) => {
-          console.log("PPE email sent successfully!", response.status, response.text);
-          alert("PPE email sent successfully!");
-        },
-        (err) => {
-          console.error("Failed to send PPE email. Error:", err);
-          alert("Failed to send PPE email. Check console.");
-        }
-      );
+    alert("Email sent successfully!");
   };
-
-  // --- Send Email for Machine ---
-  const handleSendMachineEmail = () => {
-    const message = "Warning: Some machines have not passed the quality check. Immediate action required!";
-
-    emailjs
-      .send(
-        "service_eac785b",       // replace with your EmailJS service ID
-        "template_resphar",      // Machine template ID
-        { title: message },      // template variable
-        "M3qxulbWtcwpbhfQS"     // replace with your EmailJS public key
-      )
-      .then(
-        (response) => {
-          console.log("Machine email sent successfully!", response.status, response.text);
-          alert("Machine email sent successfully!");
-        },
-        (err) => {
-          console.error("Failed to send Machine email. Error:", err);
-          alert("Failed to send Machine email. Check console.");
-        }
-      );
-  };
-
-  // --- Cleanup object URLs ---
   useEffect(() => {
     return () => {
       if (previewUrl) URL.revokeObjectURL(previewUrl);
@@ -121,34 +98,34 @@ const CheckView = ({ checkType }) => {
   const renderPPECheck = () => (
     <div className="space-y-8 relative">
       <h2 className="text-3xl font-bold text-gray-800 text-center">
-        PPE Compliance Image Analysis
+        PPE Compliance Check
       </h2>
-      
+
       {/* Upload Form */}
       <form onSubmit={handleUpload} className="p-8 bg-white rounded-xl shadow-lg border border-indigo-200">
         <div className="flex flex-col items-center space-y-4">
           <label className="w-full">
-            <input
-              type="file"
+          <input
+            type="file"
               accept="image/jpeg,image/png,image/jpg" 
-              onChange={handleFileChange}
+            onChange={handleFileChange}
               className="hidden"
-            />
+          />
             <div className="cursor-pointer bg-indigo-100 border border-indigo-300 text-indigo-700 py-3 px-6 rounded-lg text-center font-semibold hover:bg-indigo-200 transition flex items-center justify-center">
               <ImageIcon className="w-5 h-5 mr-2" />
               {selectedFile ? selectedFile.name : "Choose Image File (JPG, PNG)"}
-            </div>
-          </label>
+          </div>
+        </label>
           
           {error && <p className="text-red-600 text-sm font-medium">{error}</p>}
 
-          <button
-            type="submit"
+        <button
+          type="submit"
             disabled={loading || !selectedFile}
             className="w-full sm:w-1/2 mt-4 bg-indigo-600 text-white font-bold py-3 rounded-lg shadow-md hover:bg-indigo-700 transition disabled:opacity-50"
-          >
+        >
             {loading ? 'Analyzing Image...' : 'Run PPE Check'}
-          </button>
+        </button>
         </div>
       </form>
 
@@ -191,7 +168,14 @@ const CheckView = ({ checkType }) => {
         )}
       </div>
 
-      {/* Send PPE Email Button */}
+      {/* Violations */}
+      {ppeViolations.length > 0 && (
+        <div className="text-center text-red-600 text-lg font-semibold">
+          Violations Detected: {ppeViolations.join(", ")}
+        </div>
+      )}
+
+      {/* Manual Email Button */}
       <button
         onClick={handleSendPPEEmail}
         className="fixed bottom-8 right-8 bg-indigo-600 text-white px-6 py-3 rounded-full shadow-lg hover:bg-indigo-700 transition font-semibold flex items-center space-x-2"
@@ -212,17 +196,17 @@ const CheckView = ({ checkType }) => {
     ];
 
     return (
-      <div className="space-y-6">
+    <div className="space-y-6">
         <h2 className="text-3xl font-bold text-gray-800 text-center mb-6">Machine Quality Check</h2>
         <div className="overflow-x-auto">
           <table className="min-w-full bg-white rounded-xl shadow-md border border-gray-200">
-            <thead className="bg-gray-100">
-              <tr>
+        <thead className="bg-gray-100">
+          <tr>
                 <th className="py-3 px-6 text-left font-medium text-gray-700">Checkpoint</th>
                 <th className="py-3 px-6 text-left font-medium text-gray-700">Status</th>
                 <th className="py-3 px-6 text-left font-medium text-gray-700">Date & Time</th>
-              </tr>
-            </thead>
+          </tr>
+        </thead>
             <tbody>
               {checkpoints.map((cp) => (
                 <tr key={cp.id} className={cp.status === "Not Passed" ? "bg-red-100" : "bg-green-100"}>
@@ -232,7 +216,7 @@ const CheckView = ({ checkType }) => {
                 </tr>
               ))}
             </tbody>
-          </table>
+      </table>
         </div>
 
         {/* Send Machine Email Button */}
@@ -244,9 +228,9 @@ const CheckView = ({ checkType }) => {
             Send Machine Warning Email
           </button>
         </div>
-      </div>
-    );
-  };
+    </div>
+  );
+  
 
   return (
     <div className="max-w-6xl mx-auto py-8">
