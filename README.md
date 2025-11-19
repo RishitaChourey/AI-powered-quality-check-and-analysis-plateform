@@ -13,6 +13,10 @@ This phase installs all standard libraries and links the custom YOLOv12 submodul
 1️⃣ Create and Activate Virtual Environment
 ```bash
 python -m venv venv
+
+**if the user doesn't have the persmissions to create virtual env, run the folowing:
+Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
+
 🪟 Windows
 .\venv\Scripts\activate
 🐧 macOS / Linux
