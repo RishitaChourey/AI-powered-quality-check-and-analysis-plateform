@@ -1,5 +1,50 @@
-node_modules/
-__pycache__/
+# 🔹 Python virtual environments
 venv/
-backend/venv
-backend\venv
+.venv/
+backend/venv/
+backend/.venv/
+
+# 🔹 Python cache and compiled files
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# 🔹 Node.js dependencies
+frontend/node_modules/
+node_modules/
+
+# 🔹 Databases and model weights
+*.db
+*.sqlite
+*.pt
+*.pth
+
+# 🔹 Build and distribution folders
+dist/
+build/
+*.egg-info/
+
+# 🔹 Editor and OS files
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# 🔹 Static / temporary data
+static/
+uploads/
+backend/static/
+backend/uploads/
+backend/yolov12/
+
+
+# 🔹 Logs and temporary files
+*.log
+logs/
+temp/
+tmp/
+
+# 🔹 Environment variables
+.env
+.env.local

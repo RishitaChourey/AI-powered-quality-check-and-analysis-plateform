@@ -1,6 +1,9 @@
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import axios from "axios";
 import Webcam from "react-webcam";
+
+const PPE_API = "http://127.0.0.1:8000/predict/";
+const EMAIL_API = "http://127.0.0.1:8000/send_email/";
 
 const PPEDetectionView = () => {
   const [file, setFile] = useState(null);
@@ -24,7 +27,6 @@ const PPEDetectionView = () => {
     const imageSrc = webcamRef.current.getScreenshot();
     if (!imageSrc) return alert("Unable to capture from webcam.");
 
-    // Convert base64 image to File object
     fetch(imageSrc)
       .then((res) => res.blob())
       .then((blob) => {
@@ -45,9 +47,9 @@ const PPEDetectionView = () => {
 
     try {
       setLoading(true);
-      setProgress(30); // Initial progress state
+      setProgress(30);
 
-      const res = await axios.post("http://127.0.0.1:8000/predict/", formData, {
+      const res = await axios.post(PPE_API, formData, {
         headers: { "Content-Type": "multipart/form-data" },
         onUploadProgress: (progressEvent) => {
           const percent = Math.round(
@@ -57,7 +59,7 @@ const PPEDetectionView = () => {
         },
       });
 
-      setProgress(90); // Close to completion
+      setProgress(90);
 
       const data = res.data;
       setDetections(data.detections || []);
@@ -76,6 +78,49 @@ const PPEDetectionView = () => {
     } finally {
       setLoading(false);
       setTimeout(() => setProgress(0), 800);
+    }
+  };
+
+  // Automatically send PPE alert email when detections are found
+  useEffect(() => {
+    if (detections.length > 0) {
+      sendPPEEmail();
+    }
+  }, [detections]);
+
+  // Send PPE violation email via FastAPI backend
+  const sendPPEEmail = async () => {
+    try {
+      const totalViolations = detections.length;
+      const summaryText = Object.entries(summary)
+        .map(([cls, count]) => `${cls}: ${count}`)
+        .join(", ");
+
+      const subject = "⚠️ PPE Violation Alert";
+      const body = `
+        <p>Dear Employee,</p>
+        <p>This is to formally notify you that during a recent safety inspection, it was observed that you were not wearing the required Personal Protective Equipment (PPE), specifically ${summaryText}.</p>
+        <p>Safety in the workplace is of utmost importance, and compliance with PPE guidelines is mandatory for your protection and the safety of others.</p>
+        <p>Please consider this a formal warning. Any future violations may result in further disciplinary action as per company safety policies.</p>
+        <p>You are required to immediately ensure full compliance with all PPE requirements at all times while on site.</p>
+        <p>Thank you for your attention and cooperation.</p>
+        <br>
+        <p>Sincerely,<br>TEIM</p>
+      `;
+
+      await fetch(EMAIL_API, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          to: ["industryproject87@gmail.com"], 
+          subject,
+          body,
+        }),
+      });
+
+      console.log("✅ PPE email sent successfully via FastAPI backend");
+    } catch (error) {
+      console.error("❌ Error sending PPE email:", error);
     }
   };
 
@@ -184,7 +229,9 @@ const PPEDetectionView = () => {
 
           {Object.keys(summary).length > 0 && (
             <div className="mt-4">
-              <h4 className="text-lg font-semibold text-gray-800 mb-2">Summary</h4>
+              <h4 className="text-lg font-semibold text-gray-800 mb-2">
+                Summary
+              </h4>
               <ul className="grid grid-cols-2 md:grid-cols-3 gap-2">
                 {Object.entries(summary).map(([cls, count]) => (
                   <li key={cls} className="bg-gray-100 px-3 py-1 rounded">
@@ -199,7 +246,6 @@ const PPEDetectionView = () => {
           )}
         </div>
       )}
-
 
       {(originalMedia || annotatedMedia) && (
         <div className="mt-10 grid grid-cols-1 md:grid-cols-2 gap-6 w-full max-w-5xl">
