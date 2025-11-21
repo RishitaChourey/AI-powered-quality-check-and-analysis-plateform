@@ -1,256 +1,186 @@
-// src/views/CheckView.jsx
+// frontend/src/pages/CheckView.js
+import React, { useState, useRef } from "react";
+import Webcam from "react-webcam";
 
-import React, { useState, useEffect } from 'react';
-import { Camera, Image as ImageIcon, Download, Mail } from 'lucide-react'; 
-import emailjs from '@emailjs/browser'; // EmailJS import
+const MACHINE_API = "http://127.0.0.1:8000/predict_machine/";
 
-const API_ENDPOINT = 'http://127.0.0.1:8000/api/check_ppe_image/'; // YOLO API
-
-const CheckView = ({ checkType }) => {
-  const [selectedFile, setSelectedFile] = useState(null);
+const CheckView = () => {
+  const [file, setFile] = useState(null);
+  const [originalMedia, setOriginalMedia] = useState("");
+  const [processedMedia, setProcessedMedia] = useState("");
   const [loading, setLoading] = useState(false);
-  const [processedImageUrl, setProcessedImageUrl] = useState(null);
-  const [error, setError] = useState(null);
-  const [previewUrl, setPreviewUrl] = useState(null);
+  const [progress, setProgress] = useState(0);
+  const [useWebcam, setUseWebcam] = useState(false);
 
-  // --- File selection ---
-  const handleFileChange = (event) => {
-    const file = event.target.files[0];
-    setSelectedFile(file);
-    setProcessedImageUrl(null);
-    setError(null);
-    setPreviewUrl(file ? URL.createObjectURL(file) : null);
+  const webcamRef = useRef(null);
+
+  // File Upload Handler
+  const handleFileChange = (e) => {
+    const selected = e.target.files?.[0] || null;
+    setFile(selected);
+    setOriginalMedia(selected ? URL.createObjectURL(selected) : "");
+    setProcessedMedia("");
+    setProgress(0);
   };
 
-  // --- Upload to YOLO API ---
-  const handleUpload = async (e) => {
-    e.preventDefault();
-    if (!selectedFile) {
-      setError("Please select an image file to upload.");
-      return;
-    }
+  // Webcam Capture
+  const captureFromWebcam = async () => {
+    const shot = webcamRef.current?.getScreenshot();
+    if (!shot) return alert("Unable to capture.");
 
-    if (processedImageUrl) URL.revokeObjectURL(processedImageUrl);
+    const res = await fetch(shot);
+    const blob = await res.blob();
+
+    const webcamImage = new File([blob], "webcam_machine.jpg", {
+      type: "image/jpeg",
+    });
+
+    setFile(webcamImage);
+    setOriginalMedia(URL.createObjectURL(webcamImage));
+    setProcessedMedia("");
+  };
+
+  // Submit to Backend
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!file) return alert("Please upload or capture an image!");
 
     setLoading(true);
-    setError(null);
-    setProcessedImageUrl(null);
+    setProgress(20);
 
-    const formData = new FormData();
-    formData.append('file', selectedFile);
+    const fd = new FormData();
+    fd.append("file", file);
 
     try {
-      const response = await fetch(API_ENDPOINT, { method: 'POST', body: formData });
-      if (response.ok) {
-        const imageBlob = await response.blob();
-        setProcessedImageUrl(URL.createObjectURL(imageBlob));
-      } else {
-        const errorText = await response.text();
-        let errorMessage = `Server responded with status ${response.status}.`;
-        try {
-          const errorData = JSON.parse(errorText);
-          errorMessage = errorData.detail || errorData.message || errorMessage;
-        } catch (e) {
-          console.error('Non-JSON error response:', errorText);
-        }
-        setError(errorMessage);
+      const response = await fetch(MACHINE_API, { method: "POST", body: fd });
+      setProgress(70);
+
+      const data = await response.json();
+      if (data.processed_image) {
+        setProcessedMedia('http://127.0.0.1:8000${data.processed_image}');
       }
+
+      setProgress(100);
     } catch (err) {
-      console.error('Upload Error:', err);
-      setError("Network error: Could not connect to the backend server.");
+      console.error(err);
+      alert("Processing failed!");
     } finally {
       setLoading(false);
+      setTimeout(() => setProgress(0), 700);
     }
-  };
-
-  // --- Send Email for PPE ---
-  const handleSendPPEEmail = () => {
-    const message = "PPE has been checked for the selected image.";
-
-    emailjs
-      .send(
-        "service_4ku5fmq",       // replace with your EmailJS service ID
-        "template_ppe",          // PPE template ID
-        { title: message },      // template variable
-        "M3qxulbWtcwpbhfQS"     // replace with your EmailJS public key
-      )
-      .then(
-        (response) => {
-          console.log("PPE email sent successfully!", response.status, response.text);
-          alert("PPE email sent successfully!");
-        },
-        (err) => {
-          console.error("Failed to send PPE email. Error:", err);
-          alert("Failed to send PPE email. Check console.");
-        }
-      );
-  };
-
-  // --- Send Email for Machine ---
-  const handleSendMachineEmail = () => {
-    const message = "Warning: Some machines have not passed the quality check. Immediate action required!";
-
-    emailjs
-      .send(
-        "service_eac785b",       // replace with your EmailJS service ID
-        "template_resphar",      // Machine template ID
-        { title: message },      // template variable
-        "M3qxulbWtcwpbhfQS"     // replace with your EmailJS public key
-      )
-      .then(
-        (response) => {
-          console.log("Machine email sent successfully!", response.status, response.text);
-          alert("Machine email sent successfully!");
-        },
-        (err) => {
-          console.error("Failed to send Machine email. Error:", err);
-          alert("Failed to send Machine email. Check console.");
-        }
-      );
-  };
-
-  // --- Cleanup object URLs ---
-  useEffect(() => {
-    return () => {
-      if (previewUrl) URL.revokeObjectURL(previewUrl);
-      if (processedImageUrl) URL.revokeObjectURL(processedImageUrl);
-    };
-  }, [previewUrl, processedImageUrl]);
-
-  // --- PPE Check UI ---
-  const renderPPECheck = () => (
-    <div className="space-y-8 relative">
-      <h2 className="text-3xl font-bold text-gray-800 text-center">
-        PPE Compliance Image Analysis
-      </h2>
-      
-      {/* Upload Form */}
-      <form onSubmit={handleUpload} className="p-8 bg-white rounded-xl shadow-lg border border-indigo-200">
-        <div className="flex flex-col items-center space-y-4">
-          <label className="w-full">
-            <input
-              type="file"
-              accept="image/jpeg,image/png,image/jpg" 
-              onChange={handleFileChange}
-              className="hidden"
-            />
-            <div className="cursor-pointer bg-indigo-100 border border-indigo-300 text-indigo-700 py-3 px-6 rounded-lg text-center font-semibold hover:bg-indigo-200 transition flex items-center justify-center">
-              <ImageIcon className="w-5 h-5 mr-2" />
-              {selectedFile ? selectedFile.name : "Choose Image File (JPG, PNG)"}
-            </div>
-          </label>
-          
-          {error && <p className="text-red-600 text-sm font-medium">{error}</p>}
-
-          <button
-            type="submit"
-            disabled={loading || !selectedFile}
-            className="w-full sm:w-1/2 mt-4 bg-indigo-600 text-white font-bold py-3 rounded-lg shadow-md hover:bg-indigo-700 transition disabled:opacity-50"
-          >
-            {loading ? 'Analyzing Image...' : 'Run PPE Check'}
-          </button>
-        </div>
-      </form>
-
-      {/* Loading */}
-      {loading && (
-        <div className="text-center p-10">
-          <svg className="animate-spin h-8 w-8 text-indigo-600 mx-auto" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-          </svg>
-          <p className="mt-4 text-indigo-600 font-medium">Processing image with YOLOv8...</p>
-        </div>
-      )}
-
-      {/* Preview & Processed Image */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {previewUrl && (
-          <div className="p-4 bg-white rounded-xl shadow-md border border-gray-200">
-            <h3 className="text-xl font-bold text-gray-700 mb-3 flex items-center">
-              <Camera className="w-5 h-5 mr-2" /> Original Image
-            </h3>
-            <img src={previewUrl} alt="Original Upload" className="w-full max-h-96 object-contain rounded-lg shadow-inner" />
-          </div>
-        )}
-
-        {processedImageUrl && (
-          <div className="p-4 bg-white rounded-xl shadow-lg border-2 border-green-400">
-            <h3 className="text-xl font-bold text-green-700 mb-3 flex items-center">
-              <ImageIcon className="w-5 h-5 mr-2" /> Detection Output
-            </h3>
-            <img src={processedImageUrl} alt="Processed Output" className="w-full max-h-96 object-contain rounded-lg shadow-md" />
-            <a 
-              href={processedImageUrl} 
-              download="processed_ppe_detection.jpg" 
-              className="mt-4 inline-flex items-center bg-green-600 text-white py-2 px-4 rounded-lg hover:bg-green-700 transition font-medium"
-            >
-              <Download className="w-4 h-4 mr-2" /> Download Result
-            </a>
-          </div>
-        )}
-      </div>
-
-      {/* Send PPE Email Button */}
-      <button
-        onClick={handleSendPPEEmail}
-        className="fixed bottom-8 right-8 bg-indigo-600 text-white px-6 py-3 rounded-full shadow-lg hover:bg-indigo-700 transition font-semibold flex items-center space-x-2"
-      >
-        <Mail className="w-5 h-5" />
-        <span>Send PPE Email</span>
-      </button>
-    </div>
-  );
-
-  // --- Machine Quality Check UI ---
-  const renderMachineCheck = () => {
-    const checkpoints = [
-      { id: 1, name: "LOCK", status: "Passed", datetime: "2025-10-06 09:15" },
-      { id: 2, name: "WIRES", status: "Not Passed", datetime: "2025-10-06 09:45" },
-      { id: 3, name: "LOGO", status: "Passed", datetime: "2025-10-06 10:00" },
-      { id: 4, name: "STICKERS", status: "Not Passed", datetime: "2025-10-06 10:30" },
-    ];
-
-    return (
-      <div className="space-y-6">
-        <h2 className="text-3xl font-bold text-gray-800 text-center mb-6">Machine Quality Check</h2>
-        <div className="overflow-x-auto">
-          <table className="min-w-full bg-white rounded-xl shadow-md border border-gray-200">
-            <thead className="bg-gray-100">
-              <tr>
-                <th className="py-3 px-6 text-left font-medium text-gray-700">Checkpoint</th>
-                <th className="py-3 px-6 text-left font-medium text-gray-700">Status</th>
-                <th className="py-3 px-6 text-left font-medium text-gray-700">Date & Time</th>
-              </tr>
-            </thead>
-            <tbody>
-              {checkpoints.map((cp) => (
-                <tr key={cp.id} className={cp.status === "Not Passed" ? "bg-red-100" : "bg-green-100"}>
-                  <td className="py-3 px-6">{cp.name}</td>
-                  <td className={`py-3 px-6 font-semibold ${cp.status === "Not Passed" ? "text-red-700" : "text-green-700"}`}>{cp.status}</td>
-                  <td className="py-3 px-6">{cp.datetime}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-
-        {/* Send Machine Email Button */}
-        <div className="text-center mt-6">
-          <button
-            onClick={handleSendMachineEmail}
-            className="bg-red-600 text-white font-semibold py-3 px-6 rounded-lg shadow-md hover:bg-red-700 transition"
-          >
-            Send Machine Warning Email
-          </button>
-        </div>
-      </div>
-    );
   };
 
   return (
-    <div className="max-w-6xl mx-auto py-8">
-      {checkType === 'PPE' ? renderPPECheck() : renderMachineCheck()}
+    <div className="flex flex-col items-center mt-8 p-4 w-full">
+      <div className="bg-white p-6 rounded-lg shadow-lg w-full max-w-2xl">
+        <h2 className="text-3xl font-bold mb-4 text-center text-gray-800">
+          Machine Quality Check
+        </h2>
+        <p className="text-gray-600 mb-6 text-center">
+          Upload an image or capture via webcam to run machine quality analysis.
+        </p>
+
+        {/* Webcam Toggle */}
+        <div className="flex justify-center mb-4">
+          <button
+            onClick={() => {
+              setUseWebcam((v) => !v);
+              setFile(null);
+              setOriginalMedia("");
+              setProcessedMedia("");
+            }}
+            className={`px-5 py-2 rounded font-semibold text-white ${
+              useWebcam
+                ? "bg-gray-500 hover:bg-gray-600"
+                : "bg-green-600 hover:bg-green-700"
+            }`}
+          >
+            {useWebcam ? "Use File Upload" : "Use Webcam"}
+          </button>
+        </div>
+
+        {!useWebcam ? (
+          /* File Upload */
+          <form onSubmit={handleSubmit} className="flex flex-col items-center gap-3">
+            <input
+              type="file"
+              accept="image/,video/"
+              onChange={handleFileChange}
+              className="p-2 border rounded w-full max-w-sm text-gray-700"
+            />
+
+            <button
+              type="submit"
+              disabled={loading}
+              className={`px-6 py-2 rounded text-white font-semibold ${
+                loading ? "bg-blue-400" : "bg-blue-600 hover:bg-blue-700"
+              }`}
+            >
+              {loading ? 'Processing... ${progress}%' : "Upload & Analyze"}
+            </button>
+
+            {loading && (
+              <div className="w-full max-w-sm mt-3">
+                <div className="bg-gray-200 h-3 rounded-full">
+                  <div
+                    className="bg-blue-600 h-3 rounded-full"
+                    style={{ width: '${progress}%' }}
+                  />
+                </div>
+                <p className="text-center text-sm text-gray-600 mt-1">
+                  Processing... {progress}%
+                </p>
+              </div>
+            )}
+          </form>
+        ) : (
+          /* Webcam */
+          <div className="flex flex-col items-center gap-3">
+            <Webcam
+              audio={false}
+              ref={webcamRef}
+              screenshotFormat="image/jpeg"
+              className="rounded-lg shadow-md w-full max-w-sm"
+            />
+
+            <div className="flex gap-3">
+              <button
+                onClick={captureFromWebcam}
+                className="px-6 py-2 bg-green-600 text-white rounded"
+              >
+                Capture
+              </button>
+
+              <button
+                onClick={handleSubmit}
+                disabled={!file || loading}
+                className="px-6 py-2 bg-blue-600 text-white rounded"
+              >
+                {loading ? "Processing..." : "Analyze"}
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Preview Section */}
+      {(originalMedia || processedMedia) && (
+        <div className="mt-10 grid grid-cols-1 md:grid-cols-2 gap-6 w-full max-w-4xl">
+          {originalMedia && (
+            <div className="bg-white rounded-lg p-4 shadow-lg">
+              <h3 className="text-lg font-semibold mb-3">Original</h3>
+              <img src={originalMedia} alt="original" className="rounded-lg w-full" />
+            </div>
+          )}
+
+          {processedMedia && (
+            <div className="bg-white rounded-lg p-4 shadow-lg">
+              <h3 className="text-lg font-semibold mb-3">Processed Output</h3>
+              <img src={processedMedia} alt="processed" className="rounded-lg w-full" />
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 };
