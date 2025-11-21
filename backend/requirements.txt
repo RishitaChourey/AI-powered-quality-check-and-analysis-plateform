@@ -12,3 +12,5 @@ reportlab
 flask_cors
 flask
 moviepy
+supabase
+python-dotenv
