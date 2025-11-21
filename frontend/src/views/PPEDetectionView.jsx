@@ -2,12 +2,14 @@ import React, { useState, useRef, useEffect } from "react";
 import axios from "axios";
 import Webcam from "react-webcam";
 
-const PPE_API = "http://127.0.0.1:8000/predict/";
-const EMAIL_API = "http://127.0.0.1:8000/send_email/";
+const API_BASE = "http://127.0.0.1:8000";
+const PPE_API = `${API_BASE}/predict/`;
+const EMAIL_API = `${API_BASE}/send_email/`;
 
 const PPEDetectionView = () => {
   const [file, setFile] = useState(null);
   const [detections, setDetections] = useState([]);
+  const [summary, setSummary] = useState({});
   const [originalMedia, setOriginalMedia] = useState("");
   const [annotatedMedia, setAnnotatedMedia] = useState("");
   const [loading, setLoading] = useState(false);
@@ -15,31 +17,68 @@ const PPEDetectionView = () => {
   const [progress, setProgress] = useState(0);
   const [useWebcam, setUseWebcam] = useState(false);
   const webcamRef = useRef(null);
-  const [summary, setSummary] = useState({});
 
   const handleFileChange = (e) => {
-    const selectedFile = e.target.files[0];
+    const selectedFile = e.target.files?.[0] || null;
     setFile(selectedFile);
-    setIsVideo(selectedFile && selectedFile.type.startsWith("video/"));
+    setIsVideo(selectedFile ? selectedFile.type.startsWith("video/") : false);
+
+    setDetections([]);
+    setSummary({});
+    setOriginalMedia("");
+    setAnnotatedMedia("");
+    setProgress(0);
   };
 
-  const captureFromWebcam = () => {
-    const imageSrc = webcamRef.current.getScreenshot();
+  // NEW — Correct working download logic (Option 1)
+  const handleDownload = async () => {
+    if (!annotatedMedia) return;
+
+    try {
+      const response = await fetch(annotatedMedia);
+      const blob = await response.blob();
+
+      const url = window.URL.createObjectURL(blob);
+
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = annotatedMedia.split("/").pop() || "download";
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+
+      window.URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error("Download failed:", error);
+    }
+  };
+
+  const captureFromWebcam = async () => {
+    const imageSrc = webcamRef.current?.getScreenshot();
     if (!imageSrc) return alert("Unable to capture from webcam.");
 
-    fetch(imageSrc)
-      .then((res) => res.blob())
-      .then((blob) => {
-        const capturedFile = new File([blob], "webcam_capture.jpg", {
-          type: "image/jpeg",
-        });
-        setFile(capturedFile);
-        setIsVideo(false);
+    try {
+      const res = await fetch(imageSrc);
+      const blob = await res.blob();
+      const capturedFile = new File([blob], "webcam_capture.jpg", {
+        type: "image/jpeg",
       });
+      setFile(capturedFile);
+      setIsVideo(false);
+
+      const url = URL.createObjectURL(capturedFile);
+      setOriginalMedia(url);
+      setAnnotatedMedia("");
+      setDetections([]);
+      setSummary({});
+    } catch (err) {
+      console.error("Webcam capture error:", err);
+      alert("Failed to capture from webcam.");
+    }
   };
 
   const handleSubmit = async (e) => {
-    e.preventDefault();
+    e?.preventDefault();
     if (!file) return alert("Please upload an image or video first!");
 
     const formData = new FormData();
@@ -47,82 +86,114 @@ const PPEDetectionView = () => {
 
     try {
       setLoading(true);
-      setProgress(30);
+      setProgress(10);
 
       const res = await axios.post(PPE_API, formData, {
         headers: { "Content-Type": "multipart/form-data" },
         onUploadProgress: (progressEvent) => {
+          if (!progressEvent.total) return;
           const percent = Math.round(
             (progressEvent.loaded * 100) / progressEvent.total
           );
-          setProgress(percent);
+          setProgress(Math.min(90, percent));
         },
+        timeout: 120000,
       });
 
-      setProgress(90);
+      setProgress(95);
 
-      const data = res.data;
+      const data = res.data || {};
       setDetections(data.detections || []);
       setSummary(data.summary || {});
+
       if (data.original_image) {
-        setOriginalMedia(`http://127.0.0.1:8000${data.original_image}`);
+        const orig = data.original_image.startsWith("/")
+          ? `${API_BASE}${data.original_image}`
+          : data.original_image;
+        setOriginalMedia(orig);
+      } else if (!originalMedia && file && !file.type.startsWith("video/")) {
+        setOriginalMedia(URL.createObjectURL(file));
       }
+
       if (data.annotated_image) {
-        setAnnotatedMedia(`http://127.0.0.1:8000${data.annotated_image}`);
+        const ann = data.annotated_image.startsWith("/")
+          ? `${API_BASE}${data.annotated_image}`
+          : data.annotated_image;
+        setAnnotatedMedia(ann);
       }
+
+      setIsVideo(
+        Boolean(data.is_video) || (file && file.type?.startsWith("video/"))
+      );
 
       setProgress(100);
     } catch (err) {
       console.error("Prediction error:", err);
-      alert("Something went wrong while detecting PPE.");
+      alert("Something went wrong while detecting PPE. Check backend logs.");
     } finally {
       setLoading(false);
       setTimeout(() => setProgress(0), 800);
     }
   };
 
-  // Automatically send PPE alert email when detections are found
-  useEffect(() => {
-    if (detections.length > 0) {
-      sendPPEEmail();
+  const buildSummaryHtml = (summaryObj) => {
+    if (!summaryObj || Object.keys(summaryObj).length === 0) {
+      return `<tr><td colspan="2" style="padding:8px">No violations detected</td></tr>`;
     }
-  }, [detections]);
+    return Object.entries(summaryObj)
+      .map(
+        ([k, v]) =>
+          `<tr><td style="padding:8px;border-bottom:1px solid #eee">${k}</td><td style="padding:8px;border-bottom:1px solid #eee;text-align:right">${v}</td></tr>`
+      )
+      .join("");
+  };
 
-  // Send PPE violation email via FastAPI backend
-  const sendPPEEmail = async () => {
+  const sendPPEEmail = async (summaryObj) => {
     try {
-      const totalViolations = detections.length;
-      const summaryText = Object.entries(summary)
-        .map(([cls, count]) => `${cls}: ${count}`)
-        .join(", ");
-
       const subject = "⚠️ PPE Violation Alert";
-      const body = `
-        <p>Dear Employee,</p>
-        <p>This is to formally notify you that during a recent safety inspection, it was observed that you were not wearing the required Personal Protective Equipment (PPE), specifically ${summaryText}.</p>
-        <p>Safety in the workplace is of utmost importance, and compliance with PPE guidelines is mandatory for your protection and the safety of others.</p>
-        <p>Please consider this a formal warning. Any future violations may result in further disciplinary action as per company safety policies.</p>
-        <p>You are required to immediately ensure full compliance with all PPE requirements at all times while on site.</p>
-        <p>Thank you for your attention and cooperation.</p>
-        <br>
-        <p>Sincerely,<br>TEIM</p>
+      const html = `
+        <html>
+          <body style="font-family:Arial,sans-serif;">
+            <h3>PPE Violation Report</h3>
+            <p>The system detected the following PPE violations:</p>
+            <table style="width:100%;border-collapse:collapse;">
+              <thead>
+                <tr style="background:#f8d7da;color:#721c24;">
+                  <th style="padding:8px;text-align:left">PPE Item</th>
+                  <th style="padding:8px;text-align:right">Count</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${buildSummaryHtml(summaryObj)}
+              </tbody>
+            </table>
+            <p>Regards,<br/>TEIM Safety Monitoring</p>
+          </body>
+        </html>
       `;
+
+      const recipients = ["industryproject87@gmail.com"];
 
       await fetch(EMAIL_API, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          to: ["industryproject87@gmail.com"], 
-          subject,
-          body,
-        }),
+        body: JSON.stringify({ to: recipients, subject, body: html }),
       });
 
-      console.log("✅ PPE email sent successfully via FastAPI backend");
-    } catch (error) {
-      console.error("❌ Error sending PPE email:", error);
+      console.log("Email requested to backend.");
+    } catch (err) {
+      console.error("Email send error:", err);
     }
   };
+
+  useEffect(() => {
+    if (!summary || Object.keys(summary).length === 0) return;
+    const total = Object.values(summary).reduce(
+      (s, v) => s + Number(v || 0),
+      0
+    );
+    if (total > 0) sendPPEEmail(summary);
+  }, [summary]);
 
   return (
     <div className="flex flex-col items-center mt-8 p-4 w-full">
@@ -136,7 +207,15 @@ const PPEDetectionView = () => {
 
         <div className="flex justify-center mb-4">
           <button
-            onClick={() => setUseWebcam(!useWebcam)}
+            onClick={() => {
+              setUseWebcam((s) => !s);
+              setFile(null);
+              setDetections([]);
+              setSummary({});
+              setOriginalMedia("");
+              setAnnotatedMedia("");
+              setProgress(0);
+            }}
             className={`px-5 py-2 rounded font-semibold text-white transition-all duration-300 ${
               useWebcam
                 ? "bg-gray-500 hover:bg-gray-600"
@@ -168,7 +247,7 @@ const PPEDetectionView = () => {
                   : "bg-blue-600 hover:bg-blue-700"
               }`}
             >
-              {loading ? "Processing..." : "Upload & Detect"}
+              {loading ? `Processing... ${progress}%` : "Upload & Detect"}
             </button>
 
             {loading && (
@@ -177,7 +256,7 @@ const PPEDetectionView = () => {
                   <div
                     className="bg-blue-600 h-3 rounded-full transition-all duration-300 ease-out"
                     style={{ width: `${progress}%` }}
-                  ></div>
+                  />
                 </div>
                 <p className="text-center text-sm text-gray-600 mt-1">
                   Processing... {progress}%
@@ -205,6 +284,7 @@ const PPEDetectionView = () => {
               >
                 Capture
               </button>
+
               <button
                 onClick={handleSubmit}
                 disabled={loading || !file}
@@ -221,29 +301,30 @@ const PPEDetectionView = () => {
         )}
       </div>
 
-      {detections.length > 0 && (
+      {Object.keys(summary).length > 0 && (
         <div className="mt-8 bg-white p-6 rounded-lg shadow-lg w-full max-w-2xl">
           <h3 className="text-2xl font-semibold mb-4 text-gray-800">
             Detections
           </h3>
 
-          {Object.keys(summary).length > 0 && (
-            <div className="mt-4">
-              <h4 className="text-lg font-semibold text-gray-800 mb-2">
-                Summary
-              </h4>
-              <ul className="grid grid-cols-2 md:grid-cols-3 gap-2">
-                {Object.entries(summary).map(([cls, count]) => (
-                  <li key={cls} className="bg-gray-100 px-3 py-1 rounded">
-                    <span className="font-medium text-gray-700">{cls}</span>
-                    <span className="float-right text-blue-600 font-semibold">
-                      {count}
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
+          <div className="mt-4">
+            <h4 className="text-lg font-semibold text-gray-800 mb-2">
+              Summary
+            </h4>
+            <ul className="grid grid-cols-2 md:grid-cols-3 gap-2">
+              {Object.entries(summary).map(([cls, count]) => (
+                <li
+                  key={cls}
+                  className="bg-gray-100 px-3 py-1 rounded"
+                >
+                  <span className="font-medium text-gray-700">{cls}</span>
+                  <span className="float-right text-blue-600 font-semibold">
+                    {count}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </div>
         </div>
       )}
 
@@ -269,11 +350,13 @@ const PPEDetectionView = () => {
               )}
             </div>
           )}
+
           {annotatedMedia && (
             <div className="bg-white rounded-lg p-4 shadow-lg">
               <h3 className="text-lg font-semibold mb-3 text-gray-800">
                 Detected PPE
               </h3>
+
               {isVideo ? (
                 <video
                   src={annotatedMedia}
@@ -287,6 +370,16 @@ const PPEDetectionView = () => {
                   className="rounded-lg shadow-lg w-full max-h-[400px] object-contain"
                 />
               )}
+
+              {/* Correct Download Button */}
+              <div className="mt-3 flex gap-2">
+                <button
+                  onClick={handleDownload}
+                  className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded font-semibold"
+                >
+                  Download
+                </button>
+              </div>
             </div>
           )}
         </div>

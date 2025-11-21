@@ -4,9 +4,9 @@ from typing import List
 
 # Email Configuration
 conf = ConnectionConfig(
-    MAIL_USERNAME="vedika.desai@cumminscollege.in",  
-    MAIL_PASSWORD="ijvv kuri ngnv jbfy",   # your Gmail app password
-    MAIL_FROM="vedika.desai@cumminscollege.in",
+    MAIL_USERNAME="factorysafety00@gmail.com",  
+    MAIL_PASSWORD="dill uyof lnro psui",   # your Gmail app password
+    MAIL_FROM="factorysafety00@gmail.com",
     MAIL_PORT=587,
     MAIL_SERVER="smtp.gmail.com",
     MAIL_STARTTLS=True,
