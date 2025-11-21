@@ -1,4 +1,4 @@
-from fastapi import FastAPI, File, UploadFile, HTTPException
+from fastapi import FastAPI, File, UploadFile, HTTPException, BackgroundTasks
 from fastapi.responses import StreamingResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
@@ -10,24 +10,12 @@ import io
 import shutil, os, glob, cv2, sys 
 from moviepy import VideoFileClip
 from collections import Counter
+from email_utils import send_detection_email, DetectionEmail
 
-app = FastAPI()
-# Allow frontend access
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],   # Allow all origins during development
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*", "Range"],
-)
-
+app = FastAPI(title="PPE Detection + Auth API", version="1.0")
 # -------------------------------
 # Add YOLOv12 folder to path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'yolov12'))
-
-# -------------------------------
-# FastAPI App
-app = FastAPI(title="PPE Detection + Auth API", version="1.0")
 
 # -------------------------------
 # CORS
@@ -37,7 +25,7 @@ app.add_middleware(
     allow_origins=origins,
     allow_credentials=True,
     allow_methods=["*"],
-    allow_headers=["*"],
+    allow_headers=["*", "Range"],
 )
 
 # -------------------------------
@@ -184,6 +172,15 @@ async def predict(file: UploadFile = File(...)):
     except Exception as e:
         return JSONResponse({"error": str(e)})
 
-@app.get("/")
-def root():
-    return {"message": "PPE detection API running!"}
+@app.post("/send_email/") 
+async def send_email(background_tasks: BackgroundTasks, email: DetectionEmail):
+    """ 
+    Expects JSON like: 
+    {
+        "to": ["a@example.com"],
+        "subject": "Subject here",
+        "body": "<html>...</html>"
+    } 
+    """
+    background_tasks.add_task(send_detection_email, email.to, email.subject, email.body)
+    return {"message": "Email will be sent in the background"}
