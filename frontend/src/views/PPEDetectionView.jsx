@@ -3,6 +3,7 @@ import { Camera, Image as ImageIcon, Download } from 'lucide-react';
 import axios from "axios";
 import Webcam from "react-webcam";
 
+
 const API_ENDPOINT = 'http://127.0.0.1:8000/predict/'; // match backend
 
 const PPEDetectionView = () => {
