@@ -59,7 +59,7 @@ const MachineDetectionView = () => {
     <div className="flex flex-col items-center mt-8 p-4 w-full">
       <div className="bg-white p-6 rounded-lg shadow-lg w-full max-w-2xl">
         <h2 className="text-3xl font-bold mb-4 text-center text-gray-800">
-          Machine Quality Detection
+          Machine Quality Analysis
         </h2>
         <p className="text-gray-600 mb-6 text-center">
           Upload a video to detect machine defects, lock issues, wiring faults,
@@ -136,23 +136,54 @@ const MachineDetectionView = () => {
       )}
 
       {checkpoints.length > 0 && (
-        <div className="mt-8 w-full max-w-2xl bg-white rounded-lg p-6 shadow-lg">
-          <h3 className="text-xl font-bold mb-4 text-gray-800">Checkpoints</h3>
-          <ul className="space-y-2">
-            {checkpoints.map((cp, idx) => (
-              <li
-                key={idx}
-                className={`flex justify-between p-3 rounded border ${
-                  cp.passed
-                    ? "border-green-500 bg-green-50 text-green-700"
-                    : "border-red-500 bg-red-50 text-red-700"
-                }`}
-              >
-                <span className="font-medium">{cp.name}</span>
-                <span>{cp.passed ? "PASS" : "FAIL"}</span>
-              </li>
-            ))}
-          </ul>
+        <div className="mt-10 w-full px-4 grid grid-cols-1 lg:grid-cols-2 gap-6">
+
+          {/* PASS BOX */}
+          <div className="w-full bg-green-100 border-l-8 border-green-600 rounded-xl p-6 shadow">
+            <h3 className="text-2xl font-bold text-green-700 mb-4">PASS</h3>
+
+            <div className="flex flex-wrap gap-3 max-h-40 overflow-y-auto pr-2">
+              {checkpoints
+                .filter((cp) => cp.passed)
+                .map((cp, idx) => (
+                  <div
+                    key={idx}
+                    className="px-4 py-2 rounded-lg bg-green-200 text-green-800 
+                              text-sm font-semibold shadow-sm"
+                  >
+                    {cp.name}
+                  </div>
+                ))}
+
+              {checkpoints.filter((cp) => cp.passed).length === 0 && (
+                <p className="text-green-600 italic">No checkpoints passed</p>
+              )}
+            </div>
+          </div>
+
+          {/* FAIL BOX */}
+          <div className="w-full bg-red-100 border-l-8 border-red-600 rounded-xl p-6 shadow">
+            <h3 className="text-2xl font-bold text-red-700 mb-4">FAIL</h3>
+
+            <div className="flex flex-wrap gap-3 max-h-40 overflow-y-auto pr-2">
+              {checkpoints
+                .filter((cp) => !cp.passed)
+                .map((cp, idx) => (
+                  <div
+                    key={idx}
+                    className="px-4 py-2 rounded-lg bg-red-200 text-red-800 
+                              text-sm font-semibold shadow-sm"
+                  >
+                    {cp.name}
+                  </div>
+                ))}
+
+              {checkpoints.filter((cp) => !cp.passed).length === 0 && (
+                <p className="text-red-600 italic">No checkpoints failed</p>
+              )}
+            </div>
+          </div>
+
         </div>
       )}
     </div>
