@@ -9,7 +9,7 @@ from moviepy.editor import VideoFileClip
 import sqlite3, shutil, os, glob, sys, re
 
 # Email utils
-from email_utils import EmailSchema, send_email
+from email_utils import DetectionEmail, send_detection_email
 
 # -------------------------------
 app = FastAPI(title="PPE Detection + Auth API", version="1.0")
@@ -156,17 +156,14 @@ async def predict(file: UploadFile = File(...), background_tasks: BackgroundTask
         # ------------------- Summary
         summary = Counter([d["class"] for d in detections])
 
-        # ------------------- Send Email in background
-        if background_tasks and annotated_path:
-            email_body = f"<h3>PPE Detection Completed</h3><p>Summary: {summary}</p>"
+        # ------------------- Send Email in background (no attachment for now)
+        if background_tasks:
+            email_body = f"PPE Detection Completed\nSummary: {summary}"
             background_tasks.add_task(
-                send_email,
-                EmailSchema(
-                    email_to=["industryproject87@gmail.com"],  # Replace with actual recipient
-                    subject="PPE Detection Result",
-                    body=email_body,
-                    attachment_path=annotated_path
-                )
+                send_detection_email,
+                to=["industryproject87@gmail.com"],  # Replace with actual recipient
+                subject="PPE Detection Result",
+                body=email_body
             )
 
         return JSONResponse({
