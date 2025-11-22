@@ -1,32 +1,17 @@
-from fastapi import FastAPI, File, UploadFile, HTTPException
-from fastapi.responses import StreamingResponse, JSONResponse
+from fastapi import FastAPI, File, UploadFile, BackgroundTasks
+from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from ultralytics import YOLO
-from PIL import Image
-import sqlite3
-import io
-import shutil, os, glob, cv2, sys 
-from moviepy import VideoFileClip
 from collections import Counter
+from moviepy.editor import VideoFileClip
+import sqlite3, shutil, os, glob, sys, re
 
-app = FastAPI()
-# Allow frontend access
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],   # Allow all origins during development
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*", "Range"],
-)
+# Email utils
+from email_utils import EmailSchema, send_email
 
 # -------------------------------
-# Add YOLOv12 folder to path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'yolov12'))
-
-# -------------------------------
-# FastAPI App
 app = FastAPI(title="PPE Detection + Auth API", version="1.0")
 
 # -------------------------------
@@ -39,6 +24,10 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# -------------------------------
+# Add YOLOv12 folder to path (if needed)
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'yolov12'))
 
 # -------------------------------
 # SQLite DB Setup for Users
@@ -99,49 +88,45 @@ async def login(user: User):
     except Exception as e:
         return JSONResponse(content={"message": f"Server error: {e}"}, status_code=500)
 
+# -------------------------------
+# Load YOLO model
 model = YOLO("weights/best(3).pt")
 
+# -------------------------------
 # Mount static directories
-app.mount("/static", StaticFiles(directory="static"), name="static")
-
-# Ensure directories exist
 os.makedirs("static/uploads", exist_ok=True)
 os.makedirs("static/detections", exist_ok=True)
+app.mount("/static", StaticFiles(directory="static"), name="static")
 
-
-# 🔄 Convert YOLO .avi outputs to .mp4 (browser compatible)
+# -------------------------------
+# Convert .avi → .mp4
 def convert_avi_to_mp4(input_path: str) -> str:
-    """Convert YOLO output .avi to .mp4 for browser playback using MoviePy."""
     if not input_path.lower().endswith(".avi"):
-        return input_path  # already mp4 or other format
-
+        return input_path
     output_path = input_path.replace(".avi", ".mp4")
-
-    # Load and convert the video
     with VideoFileClip(input_path) as clip:
-        clip.write_videofile(
-            output_path,
-            codec='libx264',       # widely supported for browsers
-            audio_codec='aac',     # ensure audio track compatibility
-            fps=clip.fps or 20     # preserve original or fallback fps
-        )
-
-    # Clean up original file
+        clip.write_videofile(output_path, codec='libx264', audio_codec='aac', fps=clip.fps or 20)
     os.remove(input_path)
     return output_path
 
+# -------------------------------
+# PPE Detection + Auto Email
 @app.post("/predict/")
-async def predict(file: UploadFile = File(...)):
+async def predict(file: UploadFile = File(...), background_tasks: BackgroundTasks = None):
     try:
-        # Save uploaded file
-        upload_path = f"static/uploads/{file.filename}"
+        # ------------------- Sanitize filename
+        safe_filename = re.sub(r'[^a-zA-Z0-9_.-]', '_', file.filename)
+        upload_path = f"static/uploads/{safe_filename}"
         with open(upload_path, "wb") as buffer:
             shutil.copyfileobj(file.file, buffer)
 
-        # Detect if input is a video
+        if not os.path.exists(upload_path):
+            return JSONResponse({"error": "File not saved properly."})
+
+        # ------------------- Detect video
         is_video = file.content_type.startswith("video/")
 
-        # Run YOLO detection
+        # ------------------- YOLO prediction
         results = model.predict(
             source=upload_path,
             save=True,
@@ -151,7 +136,7 @@ async def predict(file: UploadFile = File(...)):
             exist_ok=True
         )
 
-        # Extract detections
+        # ------------------- Extract detections
         detections = []
         for r in results:
             for box in r.boxes:
@@ -160,23 +145,34 @@ async def predict(file: UploadFile = File(...)):
                     "confidence": float(box.conf)
                 })
 
-        # Find annotated output file
-        base_name = os.path.splitext(file.filename)[0]
-        output_dir = "static/detections"
-        detected_files = glob.glob(f"{output_dir}/{base_name}*")
+        # ------------------- Find annotated file
+        base_name = os.path.splitext(safe_filename)[0]
+        detected_files = glob.glob(f"static/detections/{base_name}*")
         annotated_path = detected_files[0].replace("\\", "/") if detected_files else None
 
-        # Convert .avi to .mp4 if necessary
         if annotated_path and annotated_path.endswith(".avi"):
-             annotated_path = convert_avi_to_mp4(annotated_path)
+            annotated_path = convert_avi_to_mp4(annotated_path)
 
-
+        # ------------------- Summary
         summary = Counter([d["class"] for d in detections])
+
+        # ------------------- Send Email in background
+        if background_tasks and annotated_path:
+            email_body = f"<h3>PPE Detection Completed</h3><p>Summary: {summary}</p>"
+            background_tasks.add_task(
+                send_email,
+                EmailSchema(
+                    email_to=["industryproject87@gmail.com"],  # Replace with actual recipient
+                    subject="PPE Detection Result",
+                    body=email_body,
+                    attachment_path=annotated_path
+                )
+            )
 
         return JSONResponse({
             "detections": detections,
             "summary": summary,
-            "original_image": f"/static/uploads/{file.filename}",
+            "original_image": f"/static/uploads/{safe_filename}",
             "annotated_image": "/" + annotated_path if annotated_path else None,
             "is_video": is_video
         })
@@ -184,6 +180,7 @@ async def predict(file: UploadFile = File(...)):
     except Exception as e:
         return JSONResponse({"error": str(e)})
 
+# -------------------------------
 @app.get("/")
 def root():
     return {"message": "PPE detection API running!"}
