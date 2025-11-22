@@ -183,6 +183,65 @@ async def predict(file: UploadFile = File(...)):
 
     except Exception as e:
         return JSONResponse({"error": str(e)})
+# Machine Quality YOLO model
+machine_model = YOLO("weights/machine_model.pt")
+
+
+@app.post("/predict_machine/")
+async def predict_machine(file: UploadFile = File(...)):
+    try:
+        # Save file
+        upload_path = f"static/uploads/{file.filename}"
+        with open(upload_path, "wb") as buffer:
+            shutil.copyfileobj(file.file, buffer)
+
+        # Run detection
+        results = machine_model.predict(
+            source=upload_path,
+            save=True,
+            conf=0.50,
+            project="static",
+            name="machine",
+            exist_ok=True,
+        stream=False,
+        vid_stride=5 
+        )
+
+        detections = []
+        for r in results:
+            for box in r.boxes:
+                detections.append({
+                    "class": machine_model.names[int(box.cls)],
+                    "confidence": float(box.conf)
+                })
+
+        # find annotated output
+        base_name = os.path.splitext(file.filename)[0]
+        output_dir = "static/machine"
+        detected_files = glob.glob(f"{output_dir}/{base_name}*")
+        annotated_path = detected_files[0].replace("\\", "/") if detected_files else None
+
+        # convert .avi → .mp4
+        if annotated_path and annotated_path.endswith(".avi"):
+            annotated_path = convert_avi_to_mp4(annotated_path)
+
+        expected_classes = list(machine_model.names.values())  # all classes your YOLO model predicts
+
+        summary = Counter([d["class"] for d in detections])
+
+        checkpoints = [
+            {"name": cls_name, "passed": summary.get(cls_name, 0) > 0}
+            for cls_name in expected_classes
+        ]
+
+        return JSONResponse({
+            "checkpoints": checkpoints,
+            "original": f"/static/uploads/{file.filename}",
+            "annotated": "/" + annotated_path if annotated_path else None,
+            "detections": detections
+        })
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=500)
 
 @app.get("/")
 def root():
