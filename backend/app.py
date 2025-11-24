@@ -210,6 +210,19 @@ async def predict(file: UploadFile = File(...)):
     except Exception as e:
         return JSONResponse({"error": str(e)})
 
+@app.get("/api/dashboard")
+async def dashboard_summary():
+    try:
+        conn = mysql.connector.connect(**MYSQL_CONFIG)
+        cursor = conn.cursor(dictionary=True)
+        cursor.execute("SELECT class_name, count FROM class_summary")
+        rows = cursor.fetchall()
+        conn.close()
+
+        return JSONResponse(content={"summary": rows}, status_code=200)
+    except Exception as e:
+        return JSONResponse(content={"error": str(e)}, status_code=500)
+    
 @app.get("/")
 def root():
     return {"message": "PPE detection API running!"}

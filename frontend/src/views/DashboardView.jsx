@@ -1,11 +1,25 @@
 // src/views/DashboardView.jsx
 
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 
 /**
  * Dashboard View (Design a2.jpg)
  */
 const DashboardView = () => {
+  const [summary, setSummary] = useState([]);
+
+  useEffect(() => {
+    // Fetch detection summary from backend
+    fetch("http://localhost:8000/api/dashboard")
+      .then(res => res.json())
+      .then(data => {
+        if (data.summary) {
+          setSummary(data.summary);
+        }
+      })
+      .catch(err => console.error("Error fetching dashboard data:", err));
+  }, []);
+
   const StatCircle = ({ percent, title, color }) => (
     <div className="flex flex-col items-center p-4">
       <div className={`relative w-28 h-28 flex items-center justify-center rounded-full border-4 ${color}`}>
@@ -17,6 +31,38 @@ const DashboardView = () => {
 
   return (
     <div className="max-w-6xl mx-auto p-6">
+      {/* Detection Summary Table */}
+      <div className="bg-white p-6 rounded-xl shadow-lg border border-gray-100 mb-8">
+        <h3 className="text-2xl font-semibold mb-6 text-gray-700 border-b pb-2">Detection Summary</h3>
+        <div className="overflow-x-auto">
+          <table className="min-w-full border-collapse border border-gray-200 rounded-lg">
+            <thead className="bg-gray-50">
+              <tr>
+                <th className="border border-gray-200 px-6 py-3 text-left text-sm font-semibold text-gray-700">Class Name</th>
+                <th className="border border-gray-200 px-6 py-3 text-left text-sm font-semibold text-gray-700">Count</th>
+              </tr>
+            </thead>
+            <tbody>
+              {summary.length > 0 ? (
+                summary.map((item, idx) => (
+                  <tr key={idx} className="hover:bg-gray-50">
+                    <td className="border border-gray-200 px-6 py-3 text-sm text-gray-800">{item.class_name}</td>
+                    <td className="border border-gray-200 px-6 py-3 text-sm text-gray-800">{item.count}</td>
+                  </tr>
+                ))
+              ) : (
+                <tr>
+                  <td colSpan="2" className="text-center px-6 py-4 text-gray-500">
+                    No detection data available yet.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* Existing Statistic Graphs */}
       <h3 className="text-2xl font-semibold mb-6 text-gray-700 border-b pb-2">Statistic Graphs</h3>
 
       {/* Metric Circles */}
@@ -53,7 +99,6 @@ const DashboardView = () => {
         <div className="bg-white p-6 rounded-xl shadow-lg border border-gray-100">
           <h4 className="text-lg font-semibold mb-4 text-gray-700">Statistic Graph (Annual Trend)</h4>
           <div className="h-64 bg-gray-100 flex items-end p-2 rounded-lg">
-            {/* Simple Bar Chart Representation */}
             <div className="flex w-full h-full items-end justify-between space-x-1">
               {[40, 60, 80, 50, 30, 70, 90, 95, 85, 75].map((h, index) => (
                 <div key={index} className="flex flex-col items-center">
