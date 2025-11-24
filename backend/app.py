@@ -5,11 +5,12 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from ultralytics import YOLO
 from PIL import Image
-import sqlite3
+# import sqlite3
 import io
 import shutil, os, glob, cv2, sys 
 from moviepy import VideoFileClip
 from collections import Counter
+import mysql.connector
 
 app = FastAPI()
 # Allow frontend access
@@ -42,21 +43,25 @@ app.add_middleware(
 
 # -------------------------------
 # SQLite DB Setup for Users
-DB_FILE = "users.db"
+# DB_FILE = "users.db"
+'''
 if not os.path.exists(DB_FILE):
-    conn = sqlite3.connect(DB_FILE, check_same_thread=False, timeout=10)
+    conn = mysql.connector.connect(
+        host="localhost",      # or your DB host
+        user="root",
+        password="root",
+        database="ppe_detection"
+    )
     c = conn.cursor()
-    c.execute('''
-        CREATE TABLE users (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            name TEXT NOT NULL,
-            email TEXT UNIQUE NOT NULL,
-            password TEXT NOT NULL
-        )
-    ''')
     conn.commit()
     conn.close()
-
+'''
+MYSQL_CONFIG = {
+    "host": "localhost",       # change if remote
+    "user": "root",   # replace with your MySQL user
+    "password": "root",
+    "database": "ppe_detection"
+}
 # -------------------------------
 # User Model
 class User(BaseModel):
@@ -69,14 +74,14 @@ class User(BaseModel):
 @app.post("/api/signup")
 async def signup(user: User):
     try:
-        conn = sqlite3.connect(DB_FILE, check_same_thread=False, timeout=10)
+        conn = mysql.connector.connect(**MYSQL_CONFIG)
         c = conn.cursor()
-        c.execute("INSERT INTO users (name, email, password) VALUES (?, ?, ?)",
+        c.execute("INSERT INTO users (name, email, password) VALUES (%s, %s, %s)",
                   (user.name, user.email, user.password))
         conn.commit()
         conn.close()
         return JSONResponse(content={"message": "User created successfully!"}, status_code=201)
-    except sqlite3.IntegrityError:
+    except mysql.connector.errors.IntegrityError:
         return JSONResponse(content={"message": "Email already exists."}, status_code=400)
     except Exception as e:
         return JSONResponse(content={"message": f"Server error: {e}"}, status_code=500)
@@ -86,9 +91,9 @@ async def signup(user: User):
 @app.post("/api/login")
 async def login(user: User):
     try:
-        conn = sqlite3.connect(DB_FILE, check_same_thread=False, timeout=10)
+        conn = mysql.connector.connect(**MYSQL_CONFIG)
         c = conn.cursor()
-        c.execute("SELECT * FROM users WHERE email=? AND password=?", (user.email, user.password))
+        c.execute("SELECT * FROM users WHERE email=%s AND password=%s", (user.email, user.password))
         row = c.fetchone()
         conn.close()
 
@@ -129,6 +134,26 @@ def convert_avi_to_mp4(input_path: str) -> str:
     # Clean up original file
     os.remove(input_path)
     return output_path
+
+def update_class_summary(summary):
+    conn = mysql.connector.connect(**MYSQL_CONFIG)
+    cursor = conn.cursor()
+
+    for class_name, count in summary.items():
+        # Try to update existing row
+        cursor.execute(
+            "UPDATE class_summary SET count = count + %s WHERE class_name = %s",
+            (count, class_name)
+        )
+        if cursor.rowcount == 0:
+            # If no row was updated, insert new one
+            cursor.execute(
+                "INSERT INTO class_summary (class_name, count) VALUES (%s, %s)",
+                (class_name, count)
+            )
+
+    conn.commit()
+    conn.close()
 
 @app.post("/predict/")
 async def predict(file: UploadFile = File(...)):
@@ -172,6 +197,7 @@ async def predict(file: UploadFile = File(...)):
 
 
         summary = Counter([d["class"] for d in detections])
+        update_class_summary(summary)
 
         return JSONResponse({
             "detections": detections,
