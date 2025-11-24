@@ -23,29 +23,73 @@ async def send_detection_email(to: List[str], subject: str, body: str):
     # Beautified HTML email template
     html_content = f"""
     <html>
-      <body style="font-family: 'Segoe UI', sans-serif; background-color: #f4f4f7; padding: 30px;">
-        <div style="max-width: 600px; margin: auto; background: white; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
-          <div style="background-color: #dc3545; color: white; padding: 20px; border-top-left-radius: 10px; border-top-right-radius: 10px;">
-            <h2 style="margin: 0;">⚠ PPE Violation Alert</h2>
-          </div>
-          <div style="padding: 20px; color: #333;">
-            <p style="font-size: 16px;">Hello Team,</p>
-            <p style="font-size: 15px;">The PPE detection system has identified the following safety violations:</p>
+      <body style="margin:0; padding:0; background:#eef1f5; font-family:'Segoe UI', sans-serif;">
+        <table align="center" width="100%" cellpadding="0" cellspacing="0" style="padding:30px 0;">
+          <tr>
+            <td>
+              <table width="600" align="center" cellpadding="0" cellspacing="0" 
+                     style="background:white; border-radius:12px; box-shadow:0 4px 20px rgba(0,0,0,0.08); overflow:hidden;">
 
-            <div style="background: #f9f9f9; padding: 10px 15px; border-left: 4px solid #dc3545; margin: 15px 0;">
-              <p style="font-size: 15px; white-space: pre-line;">{body}</p>
-            </div>
+              <!-- HEADER -->
+              <tr>
+                <td style="background:#d62828; padding:20px 25px; color:white;">
+                  <h2 style="margin:0; font-size:24px;">⚠ PPE Violation Alert</h2>
+                </td>
+              </tr>
 
-            <p style="font-size: 15px;">Please take immediate action to ensure safety compliance.</p>
-            <p style="font-size: 15px;">Thank you,<br><b>PPE Monitoring System</b></p>
-          </div>
-          <div style="background-color: #f4f4f7; text-align: center; padding: 10px; border-top: 1px solid #ddd; font-size: 13px; color: #777;">
-            © 2025 Safety Monitoring | Automated Alert
-          </div>
-        </div>
+              <!-- BODY -->
+                <tr>
+                  <td style="padding:25px; color:#333;">
+                    <p style="font-size:16px; margin-top:0;">Hello Team,</p>
+
+                    <p style="font-size:15px; line-height:1.6;">
+                    The PPE monitoring system has detected the following safety violations:
+                    </p>
+
+                    <!-- VIOLATION BOX -->
+                    <div style="
+                        background:#fff5f5;
+                        padding:15px 18px;
+                        border-left:5px solid #d62828;
+                        margin:18px 0;
+                        border-radius:6px;
+                        font-size:15px;
+                        white-space:pre-line;">
+                          {body}
+                    </div>
+
+                    <p style="font-size:15px; line-height:1.6;">
+                      Please take immediate action to ensure workplace safety and compliance.
+                    </p>
+
+                    <p style="font-size:15px; line-height:1.6; margin-bottom:30px;">
+                      Thank you,<br>
+                      <b>PPE Monitoring System</b>
+                    </p>
+                  </td>
+                </tr>
+
+                <!-- FOOTER -->
+                  <tr>
+                    <td style="
+                        background:#f3f3f3; 
+                        text-align:center; 
+                        padding:12px; 
+                        font-size:13px; 
+                        color:#777;
+                        border-top:1px solid #ddd;">
+                        © 2025 Safety Monitoring | Automated Alert
+                    </td>
+                  </tr>
+
+              </table>
+            </td>
+          </tr>
+        </table>
       </body>
     </html>
     """
+
 
     message = MessageSchema(
         subject=subject,
