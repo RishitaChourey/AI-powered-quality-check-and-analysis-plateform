@@ -88,13 +88,15 @@ async def login(user: User):
         return JSONResponse({"message": f"Server error: {e}"}, status_code=500)
 
 # -------------------------------
-# Load YOLO model
-model = YOLO("weights/best(3).pt")
+# Load YOLO models
+ppe_model = YOLO("weights/best(3).pt")
+machine_model = YOLO("weights/machine_model.pt")
 
 # -------------------------------
 # Mount static directories
 os.makedirs("static/uploads", exist_ok=True)
 os.makedirs("static/detections", exist_ok=True)
+os.makedirs("static/machine", exist_ok=True)
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
 # -------------------------------
@@ -113,17 +115,17 @@ def convert_avi_to_mp4(input_path: str) -> str:
 @app.post("/predict/")
 async def predict(file: UploadFile = File(...), background_tasks: BackgroundTasks = None):
     try:
-        # ------------------- Sanitize filename
+        # Sanitize filename
         safe_filename = re.sub(r'[^a-zA-Z0-9_.-]', '_', file.filename)
         upload_path = f"static/uploads/{safe_filename}"
         with open(upload_path, "wb") as buffer:
             shutil.copyfileobj(file.file, buffer)
 
-        # ------------------- Detect if video
+        # Detect if video
         is_video = file.content_type.startswith("video/")
 
-        # ------------------- YOLO prediction
-        results = model.predict(
+        # YOLO prediction
+        results = ppe_model.predict(
             source=upload_path,
             save=True,
             conf=0.60,
@@ -132,16 +134,16 @@ async def predict(file: UploadFile = File(...), background_tasks: BackgroundTask
             exist_ok=True
         )
 
-        # ------------------- Extract detections
+        # Extract detections
         detections = []
         for r in results:
             for box in r.boxes:
                 detections.append({
-                    "class": model.names[int(box.cls)],
+                    "class": ppe_model.names[int(box.cls)],
                     "confidence": float(box.conf)
                 })
 
-        # ------------------- Find annotated file with extension
+        # Find annotated file
         base_name = os.path.splitext(safe_filename)[0]
         detected_files = glob.glob(f"static/detections/{base_name}*.*")
         annotated_path = None
@@ -149,17 +151,17 @@ async def predict(file: UploadFile = File(...), background_tasks: BackgroundTask
             annotated_path = detected_files[0].replace("\\", "/")
             if annotated_path.endswith(".avi"):
                 annotated_path = convert_avi_to_mp4(annotated_path)
-            annotated_path = "/" + annotated_path  # leading slash for frontend
+            annotated_path = "/" + annotated_path
 
-        # ------------------- Summary
+        # Summary
         summary = dict(Counter([d["class"] for d in detections]))
 
-        # ------------------- Send Email in background
+        # Send Email in background
         if background_tasks:
             email_body = f"PPE Detection Completed\nSummary: {summary}"
             background_tasks.add_task(
                 send_detection_email,
-                to=["industryproject87@gmail.com"],  # Replace with actual recipient
+                to=["industryproject87@gmail.com"],
                 subject="PPE Detection Result",
                 body=email_body
             )
@@ -174,14 +176,13 @@ async def predict(file: UploadFile = File(...), background_tasks: BackgroundTask
 
     except Exception as e:
         return JSONResponse({"error": str(e)})
-# Machine Quality YOLO model
-machine_model = YOLO("weights/machine_model.pt")
 
-
+# -------------------------------
+# Machine Detection + Auto Email
 @app.post("/predict_machine/")
-async def predict_machine(file: UploadFile = File(...)):
+async def predict_machine(file: UploadFile = File(...), background_tasks: BackgroundTasks = None):
     try:
-        # Save file
+        # Save uploaded file
         upload_path = f"static/uploads/{file.filename}"
         with open(upload_path, "wb") as buffer:
             shutil.copyfileobj(file.file, buffer)
@@ -194,10 +195,11 @@ async def predict_machine(file: UploadFile = File(...)):
             project="static",
             name="machine",
             exist_ok=True,
-        stream=False,
-        vid_stride=5 
+            stream=False,
+            vid_stride=5
         )
 
+        # Extract detections
         detections = []
         for r in results:
             for box in r.boxes:
@@ -206,24 +208,36 @@ async def predict_machine(file: UploadFile = File(...)):
                     "confidence": float(box.conf)
                 })
 
-        # find annotated output
+        # Find annotated output
         base_name = os.path.splitext(file.filename)[0]
         output_dir = "static/machine"
         detected_files = glob.glob(f"{output_dir}/{base_name}*")
         annotated_path = detected_files[0].replace("\\", "/") if detected_files else None
 
-        # convert .avi → .mp4
+        # Convert .avi → .mp4
         if annotated_path and annotated_path.endswith(".avi"):
             annotated_path = convert_avi_to_mp4(annotated_path)
 
-        expected_classes = list(machine_model.names.values())  # all classes your YOLO model predicts
-
+        # Summary & checkpoints
+        expected_classes = list(machine_model.names.values())
         summary = Counter([d["class"] for d in detections])
-
         checkpoints = [
             {"name": cls_name, "passed": summary.get(cls_name, 0) > 0}
             for cls_name in expected_classes
         ]
+
+        # Auto Email if any checkpoint failed
+        if background_tasks:
+            failed_checkpoints = [cp["name"] for cp in checkpoints if not cp["passed"]]
+            if failed_checkpoints:
+                subject = "Machine Quality Alert"
+                body = f"The following checkpoints failed: {failed_checkpoints}\n\nSummary: {summary}"
+                background_tasks.add_task(
+                    send_detection_email,
+                    to=["industryproject87@gmail.com"],
+                    subject=subject,
+                    body=body
+                )
 
         return JSONResponse({
             "checkpoints": checkpoints,
@@ -231,6 +245,7 @@ async def predict_machine(file: UploadFile = File(...)):
             "annotated": "/" + annotated_path if annotated_path else None,
             "detections": detections
         })
+
     except Exception as e:
         return JSONResponse({"error": str(e)}, status_code=500)
 
