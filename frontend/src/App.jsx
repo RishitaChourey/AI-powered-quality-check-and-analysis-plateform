@@ -9,9 +9,9 @@ import TitleBanner from './components/TitleBanner';
 import HomeView from './views/HomeView';
 import DashboardView from './views/DashboardView';
 import NotificationsView from './views/NotificationsView';
-import CheckView from './views/CheckView';
 import AboutView from './views/AboutView';
 import PPEDetectionView from './views/PPEDetectionView';
+import MachineDetectionView from './views/MachineDetectionView';
 
 // Authentication Views
 import LoginView from './views/LoginView';
@@ -21,7 +21,6 @@ import ForgotPasswordView from './views/ForgotPasswordView';
 
 const App = () => {
   const [currentPage, setCurrentPage] = useState('Login');
-  const [checkType, setCheckType] = useState(null);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [user, setUser] = useState(null); // Store logged-in user info
 
@@ -44,26 +43,21 @@ const App = () => {
       return;
     }
     setCurrentPage(page);
-    if (page !== 'CheckPage') {
-      setCheckType(null);
-    }
   };
 
   // Handle selection of different check types
   const handleSelectCheck = (type) => {
     if (type === 'PPE') {
-      setCurrentPage('PPE'); // Go to PPEDetectionView
-    } else {
-      setCheckType(type);
-      setCurrentPage('CheckPage');
+      setCurrentPage('PPE');
+    } else if (type === 'Machine') {
+      setCurrentPage('Machine');
     }
   };
 
   // --- Render Content based on Auth State and Page ---
   let content;
 
-  if (!isLoggedIn || ['Login', 'Signup', 'ForgotPassword', 'About'].includes(currentPage)) {
-    // Public or Auth views
+  if (!isLoggedIn && ['Login', 'Signup', 'ForgotPassword', 'About'].includes(currentPage)) {
     switch (currentPage) {
       case 'Signup':
         content = <SignupView onNavigate={handleNavigate} />;
@@ -93,14 +87,14 @@ const App = () => {
       case 'Notifications':
         content = <NotificationsView />;
         break;
-      case 'CheckPage':
-        content = <CheckView checkType={checkType} />;
+      case 'PPE':
+        content = <PPEDetectionView />;
+        break;
+      case 'Machine':
+        content = <MachineDetectionView />;
         break;
       case 'About':
         content = <AboutView onNavigate={handleNavigate} />;
-        break;
-      case 'PPE':
-        content = <PPEDetectionView />;
         break;
       case 'Home':
       default:
@@ -114,7 +108,6 @@ const App = () => {
       <Header
         onNavigate={handleNavigate}
         currentPage={currentPage}
-        checkType={checkType}
         user={user}
         isAuthenticated={isLoggedIn}
         onLogout={handleLogout}
@@ -126,5 +119,4 @@ const App = () => {
     </div>
   );
 };
-
 export default App;
