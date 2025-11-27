@@ -7,6 +7,9 @@ from ultralytics import YOLO
 from collections import Counter
 from moviepy import VideoFileClip
 import sqlite3, shutil, os, glob, re, sys
+from deep_sort_realtime.deepsort_tracker import DeepSort
+from collections import defaultdict
+import cv2
 
 # Email utils
 from email_utils import send_detection_email
@@ -89,9 +92,26 @@ async def login(user: User):
 
 # -------------------------------
 # Load YOLO models
-ppe_model = YOLO("weights/best(3).pt")
+ppe_model = YOLO("weights/ppe_model.pt")
 machine_model = YOLO("weights/machine_model.pt")
 
+# tracker for deepsort
+tracker = DeepSort(
+                        max_age=30, 
+                        n_init=3, 
+                        nms_max_overlap=1.0
+                    )
+        
+# PPE class groups
+PPE_POSITIVE = {"helmet", "goggles", "gloves", "vest", "boots", "shoes", "person"}
+PPE_NEGATIVE = {"no_helmet", "no_goggles", "no_glove", "no_shoes"}
+
+# All trackable classes
+TRACKABLE_CLASSES = [
+    "person", "helmet", "no_helmet", "vest", "no_vest",
+    "gloves", "no_glove", "goggles", "no_goggles",
+    "boots", "no_shoes"
+]
 # -------------------------------
 # Mount static directories
 os.makedirs("static/uploads", exist_ok=True)
@@ -111,7 +131,7 @@ def convert_avi_to_mp4(input_path: str) -> str:
     return output_path
 
 # -------------------------------
-# PPE Detection + Auto Email
+# PPE Detection + DeepSORT Tracking + Auto Email
 @app.post("/predict/")
 async def predict(file: UploadFile = File(...), background_tasks: BackgroundTasks = None):
     try:
@@ -124,24 +144,126 @@ async def predict(file: UploadFile = File(...), background_tasks: BackgroundTask
         # Detect if video
         is_video = file.content_type.startswith("video/")
 
-        # YOLO prediction
-        results = ppe_model.predict(
-            source=upload_path,
-            save=True,
-            conf=0.60,
-            project="static",
-            name="detections",
-            exist_ok=True
-        )
+        # Holds all face names encountered
+        all_face_results = []
 
-        # Extract detections
-        detections = []
-        for r in results:
-            for box in r.boxes:
-                detections.append({
-                    "class": ppe_model.names[int(box.cls)],
-                    "confidence": float(box.conf)
-                })
+        if is_video:
+            cap = cv2.VideoCapture(upload_path)
+            fps = int(cap.get(cv2.CAP_PROP_FPS))
+            width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+            height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+
+            output_path = f"static/detections/{safe_filename.split('.')[0]}_tracked.mp4"
+            out = cv2.VideoWriter(
+                output_path,
+                cv2.VideoWriter_fourcc(*'mp4v'),
+                fps,
+                (width, height)
+            )
+
+            # Tracking dict for all persons
+            person_summary = defaultdict(lambda: {
+                "helmet": False,
+                "vest": False,
+                "gloves": False,
+                "goggles": False,
+                "boots": False,
+                "shoes": False,
+                "violations": set()
+            })
+
+            while cap.isOpened():
+                ret, frame = cap.read()
+                if not ret:
+                    break
+
+                # YOLO detection
+                results = ppe_model(frame, conf=0.55)[0]
+
+                detections = []
+                for box in results.boxes:
+                    coords = box.xyxy[0].cpu().numpy().astype(float)
+                    x1, y1, x2, y2 = coords
+                    w, h = (x2 - x1), (y2 - y1)
+
+                    conf = float(box.conf[0])
+                    cls_id = int(box.cls[0])
+                    label = ppe_model.names[cls_id]
+
+                    if label in TRACKABLE_CLASSES:
+                        detections.append(([x1, y1, w, h], conf, label))
+
+                # DeepSORT tracking
+                tracks = tracker.update_tracks(
+                    detections if detections else [], frame=frame
+                )
+
+                # Draw tracking results
+                for track in tracks:
+                    if not track.is_confirmed():
+                        continue
+
+                    track_id = track.track_id
+                    label = track.get_det_class()
+                    x1, y1, x2, y2 = map(int, track.to_ltrb())
+
+                    # Update PPE usage & violations
+                    if label in PPE_POSITIVE:
+                        person_summary[track_id][label] = True
+                    if label in PPE_NEGATIVE:
+                        person_summary[track_id]["violations"].add(label)
+
+                    color = (0, 255, 0) if label not in PPE_NEGATIVE else (0, 0, 255)
+
+                    cv2.rectangle(frame, (x1, y1), (x2, y2), color, 2)
+                    cv2.putText(frame, f"ID {track_id}: {label}",
+                                (x1, y1 - 10),
+                                cv2.FONT_HERSHEY_SIMPLEX, 0.6, color, 2)
+
+                out.write(frame)
+
+            cap.release()
+            out.release()
+
+            # Flatten all classes detected during tracking
+            all_labels = []
+
+            for person_id, data in person_summary.items():
+                # add worn PPE items as labels
+                for item, worn in data.items():
+                    if item != "violations" and worn:
+                        all_labels.append(item)
+
+                # add violations
+                for v in data["violations"]:
+                    all_labels.append(v)
+
+            # Final flat Counter summary
+            from collections import Counter
+            summary = dict(Counter(all_labels))
+            
+        
+        else:
+            # YOLO prediction
+            results = ppe_model.predict(
+                source=upload_path,
+                save=True,
+                conf=0.60,
+                project="static",
+                name="detections",
+                exist_ok=True
+            )
+
+            # Extract detections
+            detections = []
+            for r in results:
+                for box in r.boxes:
+                    detections.append({
+                        "class": ppe_model.names[int(box.cls)],
+                        "confidence": float(box.conf)
+                    })
+            # Summary
+            summary = dict(Counter([d["class"] for d in detections]))
 
         # Find annotated file
         base_name = os.path.splitext(safe_filename)[0]
@@ -152,9 +274,6 @@ async def predict(file: UploadFile = File(...), background_tasks: BackgroundTask
             if annotated_path.endswith(".avi"):
                 annotated_path = convert_avi_to_mp4(annotated_path)
             annotated_path = "/" + annotated_path
-
-        # Summary
-        summary = dict(Counter([d["class"] for d in detections]))
 
         # Send Email in background
         if background_tasks:
