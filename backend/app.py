@@ -1,5 +1,5 @@
-from fastapi import FastAPI, File, UploadFile, HTTPException
-from fastapi.responses import StreamingResponse, JSONResponse
+from fastapi import FastAPI, File, UploadFile, BackgroundTasks
+from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
@@ -27,7 +27,6 @@ app.add_middleware(
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'yolov12'))
 
 # -------------------------------
-# FastAPI App
 app = FastAPI(title="PPE Detection + Auth API", version="1.0")
 
 # -------------------------------
@@ -44,18 +43,6 @@ app.add_middleware(
 # -------------------------------
 # SQLite DB Setup for Users
 # DB_FILE = "users.db"
-'''
-if not os.path.exists(DB_FILE):
-    conn = mysql.connector.connect(
-        host="localhost",      # or your DB host
-        user="root",
-        password="root",
-        database="ppe_detection"
-    )
-    c = conn.cursor()
-    conn.commit()
-    conn.close()
-'''
 MYSQL_CONFIG = {
     "host": "localhost",       # change if remote
     "user": "root",   # replace with your MySQL user
@@ -84,7 +71,7 @@ async def signup(user: User):
     except mysql.connector.errors.IntegrityError:
         return JSONResponse(content={"message": "Email already exists."}, status_code=400)
     except Exception as e:
-        return JSONResponse(content={"message": f"Server error: {e}"}, status_code=500)
+        return JSONResponse({"message": f"Server error: {e}"}, status_code=500)
 
 # -------------------------------
 # Login Route
@@ -96,45 +83,38 @@ async def login(user: User):
         c.execute("SELECT * FROM users WHERE email=%s AND password=%s", (user.email, user.password))
         row = c.fetchone()
         conn.close()
-
         if row:
-            return JSONResponse(content={"message": "Login successful!"}, status_code=200)
+            return JSONResponse({"message": "Login successful!"}, status_code=200)
         else:
-            return JSONResponse(content={"message": "Invalid email or password."}, status_code=401)
+            return JSONResponse({"message": "Invalid email or password."}, status_code=401)
     except Exception as e:
-        return JSONResponse(content={"message": f"Server error: {e}"}, status_code=500)
+        return JSONResponse({"message": f"Server error: {e}"}, status_code=500)
 
-model = YOLO("weights/best(3).pt")
+# -------------------------------
+# Load YOLO models
+ppe_model = YOLO("weights/best(3).pt")
+machine_model = YOLO("weights/machine_model.pt")
 
+# -------------------------------
 # Mount static directories
-app.mount("/static", StaticFiles(directory="static"), name="static")
-
-# Ensure directories exist
 os.makedirs("static/uploads", exist_ok=True)
 os.makedirs("static/detections", exist_ok=True)
+os.makedirs("static/machine", exist_ok=True)
+app.mount("/static", StaticFiles(directory="static"), name="static")
 
-
-# 🔄 Convert YOLO .avi outputs to .mp4 (browser compatible)
+# -------------------------------
+# Convert .avi → .mp4 for browser
 def convert_avi_to_mp4(input_path: str) -> str:
-    """Convert YOLO output .avi to .mp4 for browser playback using MoviePy."""
     if not input_path.lower().endswith(".avi"):
-        return input_path  # already mp4 or other format
-
+        return input_path
     output_path = input_path.replace(".avi", ".mp4")
-
-    # Load and convert the video
     with VideoFileClip(input_path) as clip:
-        clip.write_videofile(
-            output_path,
-            codec='libx264',       # widely supported for browsers
-            audio_codec='aac',     # ensure audio track compatibility
-            fps=clip.fps or 20     # preserve original or fallback fps
-        )
-
-    # Clean up original file
+        clip.write_videofile(output_path, codec='libx264', audio_codec='aac', fps=clip.fps or 20)
     os.remove(input_path)
     return output_path
 
+# -------------------------------
+# PPE Detection + Auto Email
 def update_class_summary(summary):
     conn = mysql.connector.connect(**MYSQL_CONFIG)
     cursor = conn.cursor()
@@ -156,18 +136,19 @@ def update_class_summary(summary):
     conn.close()
 
 @app.post("/predict/")
-async def predict(file: UploadFile = File(...)):
+async def predict(file: UploadFile = File(...), background_tasks: BackgroundTasks = None):
     try:
-        # Save uploaded file
-        upload_path = f"static/uploads/{file.filename}"
+        # Sanitize filename
+        safe_filename = re.sub(r'[^a-zA-Z0-9_.-]', '_', file.filename)
+        upload_path = f"static/uploads/{safe_filename}"
         with open(upload_path, "wb") as buffer:
             shutil.copyfileobj(file.file, buffer)
 
-        # Detect if input is a video
+        # Detect if video
         is_video = file.content_type.startswith("video/")
 
-        # Run YOLO detection
-        results = model.predict(
+        # YOLO prediction
+        results = ppe_model.predict(
             source=upload_path,
             save=True,
             conf=0.60,
@@ -181,7 +162,7 @@ async def predict(file: UploadFile = File(...)):
         for r in results:
             for box in r.boxes:
                 detections.append({
-                    "class": model.names[int(box.cls)],
+                    "class": ppe_model.names[int(box.cls)],
                     "confidence": float(box.conf)
                 })
 
@@ -202,8 +183,8 @@ async def predict(file: UploadFile = File(...)):
         return JSONResponse({
             "detections": detections,
             "summary": summary,
-            "original_image": f"/static/uploads/{file.filename}",
-            "annotated_image": "/" + annotated_path if annotated_path else None,
+            "original_image": f"/static/uploads/{safe_filename}",
+            "annotated_image": annotated_path,
             "is_video": is_video
         })
 
@@ -223,6 +204,79 @@ async def dashboard_summary():
     except Exception as e:
         return JSONResponse(content={"error": str(e)}, status_code=500)
     
+# -------------------------------
+# Machine Detection + Auto Email
+@app.post("/predict_machine/")
+async def predict_machine(file: UploadFile = File(...), background_tasks: BackgroundTasks = None):
+    try:
+        # Save uploaded file
+        upload_path = f"static/uploads/{file.filename}"
+        with open(upload_path, "wb") as buffer:
+            shutil.copyfileobj(file.file, buffer)
+
+        # Run detection
+        results = machine_model.predict(
+            source=upload_path,
+            save=True,
+            conf=0.50,
+            project="static",
+            name="machine",
+            exist_ok=True,
+            stream=False,
+            vid_stride=5
+        )
+
+        # Extract detections
+        detections = []
+        for r in results:
+            for box in r.boxes:
+                detections.append({
+                    "class": machine_model.names[int(box.cls)],
+                    "confidence": float(box.conf)
+                })
+
+        # Find annotated output
+        base_name = os.path.splitext(file.filename)[0]
+        output_dir = "static/machine"
+        detected_files = glob.glob(f"{output_dir}/{base_name}*")
+        annotated_path = detected_files[0].replace("\\", "/") if detected_files else None
+
+        # Convert .avi → .mp4
+        if annotated_path and annotated_path.endswith(".avi"):
+            annotated_path = convert_avi_to_mp4(annotated_path)
+
+        # Summary & checkpoints
+        expected_classes = list(machine_model.names.values())
+        summary = Counter([d["class"] for d in detections])
+        checkpoints = [
+            {"name": cls_name, "passed": summary.get(cls_name, 0) > 0}
+            for cls_name in expected_classes
+        ]
+
+        # Auto Email if any checkpoint failed
+        if background_tasks:
+            failed_checkpoints = [cp["name"] for cp in checkpoints if not cp["passed"]]
+            if failed_checkpoints:
+                subject = "Machine Quality Alert"
+                body = f"The following checkpoints failed: {failed_checkpoints}\n\nSummary: {summary}"
+                background_tasks.add_task(
+                    send_detection_email,
+                    to=["industryproject87@gmail.com"],
+                    subject=subject,
+                    body=body
+                )
+
+        return JSONResponse({
+            "checkpoints": checkpoints,
+            "original": f"/static/uploads/{file.filename}",
+            "annotated": "/" + annotated_path if annotated_path else None,
+            "detections": detections
+        })
+
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=500)
+
+# -------------------------------
 @app.get("/")
 def root():
     return {"message": "PPE detection API running!"}
