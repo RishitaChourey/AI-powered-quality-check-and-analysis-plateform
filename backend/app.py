@@ -5,7 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from ultralytics import YOLO
 from collections import Counter
-from moviepy import VideoFileClip
+from moviepy.editor import VideoFileClip
 import sqlite3, shutil, os, glob, re, sys
 
 # Email utils
