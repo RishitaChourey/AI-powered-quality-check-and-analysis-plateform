@@ -10,6 +10,7 @@ import sqlite3, shutil, os, glob, re, sys
 from deep_sort_realtime.deepsort_tracker import DeepSort
 from collections import defaultdict
 import cv2
+from deepface import DeepFace
 
 # Email utils
 from email_utils import send_detection_email
@@ -146,14 +147,15 @@ async def predict(file: UploadFile = File(...), background_tasks: BackgroundTask
 
         # Holds all face names encountered
         all_face_results = []
-
         if is_video:
             cap = cv2.VideoCapture(upload_path)
             fps = int(cap.get(cv2.CAP_PROP_FPS))
             width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
             height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
 
-            output_path = f"static/detections/{safe_filename.split('.')[0]}_tracked.mp4"
+            base_name = os.path.splitext(safe_filename)[0]
+            output_path = f"static/detections/{base_name}.mp4"
+           
             out = cv2.VideoWriter(
                 output_path,
                 cv2.VideoWriter_fourcc(*'mp4v'),
@@ -169,7 +171,8 @@ async def predict(file: UploadFile = File(...), background_tasks: BackgroundTask
                 "goggles": False,
                 "boots": False,
                 "shoes": False,
-                "violations": set()
+                "violations": set(),
+                "name": "unknown"
             })
 
             while cap.isOpened():
@@ -212,19 +215,51 @@ async def predict(file: UploadFile = File(...), background_tasks: BackgroundTask
                         person_summary[track_id][label] = True
                     if label in PPE_NEGATIVE:
                         person_summary[track_id]["violations"].add(label)
+                    person_name = "unknown"
+                    # Face recognition using DeepFace face detector on the frame
+                    try:
+                        faces = DeepFace.extract_faces(img_path=frame, enforce_detection=False)
+                        if faces:
+                            for det in faces:
+                                x, y, w, h = det["facial_area"].values()
+                                face_img = frame[y:y+h, x:x+w]
+
+                                result = DeepFace.find(
+                                    img_path=face_img,
+                                    db_path="backend/known_faces",
+                                    enforce_detection=False
+                                )
+                                if len(result) > 0 and not result.empty:
+                                    person_name = os.path.splitext(
+                                        os.path.basename(result.iloc[0]['identity'])
+                                    )[0]
+                                else:
+                                    person_name = "unknown"
+
+                                person_summary[track_id]["name"] = person_name
+                                all_face_results.append(person_name)
+                        else:
+                            person_summary[track_id]["name"] = "unknown"
+                    except Exception:
+                        person_summary[track_id]["name"] = "unknown"
+                        person_summary[track_id]["name"] = person_name
+                        all_face_results.append(person_name)
 
                     color = (0, 255, 0) if label not in PPE_NEGATIVE else (0, 0, 255)
 
                     cv2.rectangle(frame, (x1, y1), (x2, y2), color, 2)
-                    cv2.putText(frame, f"ID {track_id}: {label}",
+                    # Get the recognized name (default "unknown")
+                    person_name = person_summary[track_id].get("name", "unknown")
+
+                    # Draw label + name on bounding box
+                    cv2.putText(frame, f"ID {track_id}: {label} ({person_name})",
                                 (x1, y1 - 10),
                                 cv2.FONT_HERSHEY_SIMPLEX, 0.6, color, 2)
 
-                out.write(frame)
+                    out.write(frame)
 
             cap.release()
             out.release()
-
             # Flatten all classes detected during tracking
             all_labels = []
 
@@ -237,12 +272,12 @@ async def predict(file: UploadFile = File(...), background_tasks: BackgroundTask
                 # add violations
                 for v in data["violations"]:
                     all_labels.append(v)
+                if "name" in data:
+                    all_labels.append(data["name"])
 
             # Final flat Counter summary
-            from collections import Counter
             summary = dict(Counter(all_labels))
             
-        
         else:
             # YOLO prediction
             results = ppe_model.predict(
@@ -262,19 +297,43 @@ async def predict(file: UploadFile = File(...), background_tasks: BackgroundTask
                         "class": ppe_model.names[int(box.cls)],
                         "confidence": float(box.conf)
                     })
+              # Face recognition on image using DeepFace detector
+            try:
+                faces = DeepFace.extract_faces(img_path=upload_path, enforce_detection=False)
+                if faces:
+                    # Take the first detected face
+                    det = faces[0]
+                    x, y, w, h = det["facial_area"].values()
+                    face_img = cv2.imread(upload_path)[y:y+h, x:x+w]
+
+                    result = DeepFace.find(
+                        img_path=face_img,
+                        db_path="backend/known_faces",
+                        enforce_detection=False
+                    )
+                    if len(result) > 0 and not result.empty:
+                        person_name = os.path.splitext(
+                            os.path.basename(result.iloc[0]['identity'])
+                        )[0]
+                    else:
+                        person_name = "unknown"
+                else:
+                    person_name = "unknown"
+            except Exception:
+                person_name = "unknown"
+
             # Summary
-            summary = dict(Counter([d["class"] for d in detections]))
+            summary = dict(Counter([d["class"] for d in detections] + [person_name]))
 
         # Find annotated file
         base_name = os.path.splitext(safe_filename)[0]
         detected_files = glob.glob(f"static/detections/{base_name}*.*")
-        annotated_path = None
         if detected_files:
             annotated_path = detected_files[0].replace("\\", "/")
             if annotated_path.endswith(".avi"):
                 annotated_path = convert_avi_to_mp4(annotated_path)
             annotated_path = "/" + annotated_path
-
+            
         # Send Email in background
         if background_tasks:
             email_body = f"PPE Detection Completed\nSummary: {summary}"
@@ -285,6 +344,7 @@ async def predict(file: UploadFile = File(...), background_tasks: BackgroundTask
                 body=email_body
             )
 
+        print("Annotated path being returned:", annotated_path)
         return JSONResponse({
             "detections": detections,
             "summary": summary,

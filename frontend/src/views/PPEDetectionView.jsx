@@ -66,6 +66,8 @@ const PPEDetectionView = () => {
       setSummary(data.summary || {});
       if (data.original_image) setOriginalMedia(`http://127.0.0.1:8000${data.original_image}`);
       if (data.annotated_image) setAnnotatedMedia(`http://127.0.0.1:8000${data.annotated_image}`);
+      console.log("Backend annotated_image:", data.annotated_image);
+      console.log("React annotatedMedia state:", `http://127.0.0.1:8000${data.annotated_image}`);
 
       setProgress(100);
     } catch (err) {
