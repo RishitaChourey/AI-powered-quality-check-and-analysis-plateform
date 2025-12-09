@@ -11,7 +11,7 @@ cd AI-powered-quality-check-and-analysis-plateform
 This phase installs all standard libraries and links the custom YOLOv12 submodule to the Python path.
 
 1️⃣ Create and Activate Virtual Environment
-Ensure you have python 3.12.0 install on your system
+Ensure you have python 3.12.0 installed on your system
 ```bash
 py -3.12 -m venv .venv
 
