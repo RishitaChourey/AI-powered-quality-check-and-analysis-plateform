@@ -9,7 +9,8 @@ from moviepy.editor import VideoFileClip
 import sqlite3, shutil, os, glob, re, sys
 
 # Email utils
-from email_utils import send_detection_email
+from email_utils.ppe_email import send_ppe_email
+from email_utils.machine_email import send_machine_email
 
 # -------------------------------
 app = FastAPI(title="PPE Detection + Auth API", version="1.0")
@@ -152,10 +153,10 @@ async def predict(file: UploadFile = File(...), background_tasks: BackgroundTask
 
         if background_tasks:
             background_tasks.add_task(
-                send_detection_email,
+                send_ppe_email,
                 to=["industryproject87@gmail.com"],
                 subject="PPE Violation Alert",
-                summary=summary
+                violations=summary
             )
 
         return JSONResponse({
@@ -225,7 +226,7 @@ async def predict_machine(file: UploadFile = File(...), background_tasks: Backgr
 
             if failed_checkpoints:
                 background_tasks.add_task(
-                    send_detection_email,
+                    send_machine_email,
                     to=["industryproject87@gmail.com"],
                     subject="Machine Quality Alert",
                     summary=dict(summary)
