@@ -11,8 +11,9 @@ cd AI-powered-quality-check-and-analysis-plateform
 This phase installs all standard libraries and links the custom YOLOv12 submodule to the Python path.
 
 1️⃣ Create and Activate Virtual Environment
+Ensure you have python 3.12.0 install on your system
 ```bash
-python -m venv venv
+py -3.12 -m venv .venv
 
 **if the user doesn't have the persmissions to create virtual env, run the folowing:
 Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
@@ -22,11 +23,7 @@ Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
 🐧 macOS / Linux
 source venv/bin/activate
 ```
-2️⃣ Navigate to the Backend Folder
-```bash
-cd backend
-```
-3️⃣ Install Standard Dependencies
+2️⃣  Install Standard Dependencies
 Make sure you have a requirements.txt file in the backend folder.
 
 ```bash
@@ -34,6 +31,11 @@ pip install -r requirements.txt
 ```
 
 ▶️ Phase 3: Run the Application
+
+Navigate to the Backend Folder
+```bash
+cd backend
+```
 🧠 1️⃣ Start the Backend API (Terminal 1)
 Ensure your model weights (e.g., weights/best.pt) are present inside the backend directory.
 
