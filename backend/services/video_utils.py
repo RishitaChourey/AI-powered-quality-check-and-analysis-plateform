@@ -1,5 +1,5 @@
 import moviepy
-from moviepy import VideoFileClip
+from moviepy.editor import VideoFileClip
 import os
 
 def convert_avi_to_mp4(input_path: str) -> str:
