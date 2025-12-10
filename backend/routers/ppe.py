@@ -6,7 +6,7 @@ import asyncio
 
 from services.yolo_service import run_ppe_detection, ppe_model
 from services.video_utils import convert_avi_to_mp4
-from services.email_utils.ppe_email import send_ppe_email_sync  # wrapper
+from services.email_utils.ppe_email import send_ppe_email  # wrapper
 
 router = APIRouter()
 
@@ -48,13 +48,25 @@ async def predict(file: UploadFile = File(...), background_tasks: BackgroundTask
         # Summary
         summary = dict(Counter([d["class"] for d in detections]))
 
-        # Send Email in background
-        if background_tasks:
+         # PPE Negative filtering logic
+        PPE_NEGATIVE = [
+            "no_helmet",
+            "no_vest",
+            "no_goggles",
+            "no_glove",
+            "no_shoes"
+        ]
+
+        # Only keep negative violations
+        negative = {cls: count for cls, count in summary.items() if cls in PPE_NEGATIVE}
+
+        # Send email ONLY if negative detected
+        if negative and background_tasks:
             background_tasks.add_task(
-                send_ppe_email_sync, 
-                ["industryproject87@gmail.com"], 
-                "PPE Detection Result", 
-                summary
+                send_ppe_email,
+                to=["industryproject87@gmail.com"],
+                subject="PPE Violation Alert",
+                violations=negative
             )
 
         return JSONResponse({
