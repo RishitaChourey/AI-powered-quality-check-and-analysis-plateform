@@ -5,7 +5,7 @@ from collections import Counter
 
 from services.yolo_service import run_machine_detection, machine_model
 from services.video_utils import convert_avi_to_mp4
-from services.email_utils import send_detection_email
+from services.email_utils.machine_email import send_machine_email_sync  # <- updated
 
 router = APIRouter()
 
@@ -13,6 +13,7 @@ router = APIRouter()
 async def predict_machine(file: UploadFile = File(...), background_tasks: BackgroundTasks = None):
     try:
         # Save uploaded file
+        os.makedirs("static/uploads", exist_ok=True)
         upload_path = f"static/uploads/{file.filename}"
         with open(upload_path, "wb") as buffer:
             shutil.copyfileobj(file.file, buffer)
@@ -41,7 +42,7 @@ async def predict_machine(file: UploadFile = File(...), background_tasks: Backgr
 
         # Summary & checkpoints
         expected_classes = list(machine_model.names.values())
-        summary = Counter([d["class"] for d in detections])
+        summary = dict(Counter([d["class"] for d in detections]))
         checkpoints = [
             {"name": cls_name, "passed": summary.get(cls_name, 0) > 0}
             for cls_name in expected_classes
@@ -51,13 +52,11 @@ async def predict_machine(file: UploadFile = File(...), background_tasks: Backgr
         if background_tasks:
             failed_checkpoints = [cp["name"] for cp in checkpoints if not cp["passed"]]
             if failed_checkpoints:
-                subject = "Machine Quality Alert"
-                body = f"The following checkpoints failed: {failed_checkpoints}\n\nSummary: {summary}"
                 background_tasks.add_task(
-                    send_detection_email,
-                    to=["industryproject87@gmail.com"],
-                    subject=subject,
-                    body=body
+                    send_machine_email_sync,
+                    ["industryproject87@gmail.com"],
+                    "Machine Quality Alert",
+                    summary
                 )
 
         return JSONResponse({

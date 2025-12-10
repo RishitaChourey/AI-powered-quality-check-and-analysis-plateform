@@ -2,10 +2,11 @@ from fastapi import APIRouter, UploadFile, File, BackgroundTasks
 from fastapi.responses import JSONResponse
 import shutil, os, re, glob
 from collections import Counter
+import asyncio
 
 from services.yolo_service import run_ppe_detection, ppe_model
 from services.video_utils import convert_avi_to_mp4
-from services.email_utils import send_detection_email
+from services.email_utils.ppe_email import send_ppe_email_sync  # wrapper
 
 router = APIRouter()
 
@@ -14,6 +15,7 @@ async def predict(file: UploadFile = File(...), background_tasks: BackgroundTask
     try:
         # Sanitize filename
         safe_filename = re.sub(r'[^a-zA-Z0-9_.-]', '_', file.filename)
+        os.makedirs("static/uploads", exist_ok=True)
         upload_path = f"static/uploads/{safe_filename}"
         with open(upload_path, "wb") as buffer:
             shutil.copyfileobj(file.file, buffer)
@@ -48,12 +50,11 @@ async def predict(file: UploadFile = File(...), background_tasks: BackgroundTask
 
         # Send Email in background
         if background_tasks:
-            email_body = f"PPE Detection Completed\nSummary: {summary}"
             background_tasks.add_task(
-                send_detection_email,
-                to=["industryproject87@gmail.com"],
-                subject="PPE Detection Result",
-                body=email_body
+                send_ppe_email_sync, 
+                ["industryproject87@gmail.com"], 
+                "PPE Detection Result", 
+                summary
             )
 
         return JSONResponse({
