@@ -1,5 +1,6 @@
 // src/views/LoginView.jsx
 import React, { useState } from 'react';
+import { GoogleLogin } from "@react-oauth/google";
 
 const LoginView = ({ onNavigate, onLoginSuccess }) => {
   const [email, setEmail] = useState('');
@@ -108,6 +109,33 @@ const LoginView = ({ onNavigate, onLoginSuccess }) => {
           {/* Error Message */}
           {error && <p className="text-red-300 text-center pt-2">{error}</p>}
         </form>
+        <div className="mt-6 flex justify-center">
+          <GoogleLogin
+            onSuccess={async (cred) => {
+              const idToken = cred.credential;
+
+              const res = await fetch("http://127.0.0.1:8000/api/google", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ id_token: idToken }),
+              });
+
+              const data = await res.json();
+
+              if (res.ok) {
+                onLoginSuccess({
+                  email: data.email,
+                  name: data.name,
+                  google: true,
+                });
+              } else {
+                setError(data.detail || "Google login failed");
+              }
+            }}
+
+            onError={() => setError("Google login failed")}
+          />
+      </div>
 
         {/* Signup Link */}
         <div className="text-center mt-6">
