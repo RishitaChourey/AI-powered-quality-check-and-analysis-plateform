@@ -1,6 +1,7 @@
 // src/views/DashboardView.jsx
 
 import React from 'react';
+import { useNavigate } from 'react-router-dom';
 
 /**
  * Dashboard View (Design a2.jpg)

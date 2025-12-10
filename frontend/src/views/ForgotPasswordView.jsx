@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 
-const ForgotPasswordView = ({ onNavigate }) => {
+const ForgotPasswordView = () => {
+  const navigate = useNavigate();
   const [email, setEmail] = useState('');
   const [message, setMessage] = useState('');
 
@@ -43,7 +45,7 @@ const ForgotPasswordView = ({ onNavigate }) => {
         {message && <p className="text-center pt-2">{message}</p>}
         <div className="text-center mt-4">
           <button
-            onClick={() => onNavigate('Login')}
+            onClick={() => navigate('/')}
             className="text-white font-semibold underline hover:text-indigo-200 transition duration-150"
           >
             Back to Login

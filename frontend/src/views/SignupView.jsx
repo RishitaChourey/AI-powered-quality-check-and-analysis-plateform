@@ -1,14 +1,16 @@
 // src/views/SignupView.jsx
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 
-const SignupView = ({ onNavigate }) => {
+const SignupView = () => {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
-
+  const navigate = useNavigate();
+  
   const handleSignup = async (e) => {
     e.preventDefault();
     setError('');
@@ -40,7 +42,7 @@ const SignupView = ({ onNavigate }) => {
         setPassword('');
 
         // Redirect to login after success
-        setTimeout(() => onNavigate('Login'), 1500);
+        setTimeout(() =>  navigate('/'), 1500);
       } else {
         setError(data.detail || data.message || 'Signup failed.');
       }
@@ -123,7 +125,7 @@ const SignupView = ({ onNavigate }) => {
         {/* Back to Login Button */}
         <div className="text-center mt-6">
           <button
-            onClick={() => onNavigate('Login')}
+            onClick={() => navigate('/')}
             className="text-white font-semibold underline hover:text-indigo-200 transition duration-150"
           >
             Back to Login
