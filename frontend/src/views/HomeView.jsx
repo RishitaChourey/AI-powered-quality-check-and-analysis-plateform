@@ -1,38 +1,42 @@
 // src/views/HomeView.jsx
 import React from "react";
 import { CheckCircle, Shield, Cpu } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 
-const Card = ({ title, image, type, onSelectCheck }) => (
-  <button
-    onClick={() => onSelectCheck(type)}
-    className="w-full max-w-2xl mx-auto transform transition duration-300 
-               hover:scale-[1.03] hover:shadow-xl rounded-2xl overflow-hidden 
-               shadow-lg bg-white h-56"
-  >
-    <div className="flex flex-row h-full border-2 border-indigo-700 rounded-2xl">
+const Card = ({ title, image, type, route }) => {
+  const navigate = useNavigate(); // CHANGED: use navigate instead of onSelectCheck
+  return (
+    <button
+      onClick={() => navigate(route)} // CHANGED: navigate using route prop
+      className="w-full max-w-2xl mx-auto transform transition duration-300 
+                 hover:scale-[1.03] hover:shadow-xl rounded-2xl overflow-hidden 
+                 shadow-lg bg-white h-56"
+    >
+      <div className="flex flex-row h-full border-2 border-indigo-700 rounded-2xl">
 
-      {/* Image Section */}
-      <div className="w-1/3 bg-white h-full flex items-center justify-center overflow-hidden">
-        <img
-          src={image}
-          alt={title}
-          className="object-cover w-full h-full"
-          onError={(e) => {
-            e.target.onerror = null;
-            e.target.src = `https://placehold.co/300x300/e0e7ff/3730a3?text=${type}`;
-          }}
-        />
+        {/* Image Section */}
+        <div className="w-1/3 bg-white h-full flex items-center justify-center overflow-hidden">
+          <img
+            src={image}
+            alt={title}
+            className="object-cover w-full h-full"
+            onError={(e) => {
+              e.target.onerror = null;
+              e.target.src = `https://placehold.co/300x300/e0e7ff/3730a3?text=${type}`;
+            }}
+          />
+        </div>
+
+        {/* Text Section */}
+        <div className="w-2/3 bg-indigo-700 text-white p-6 flex justify-center items-center">
+          <h3 className="text-2xl font-bold tracking-wider text-center">{title}</h3>
+        </div>
       </div>
+    </button>
+  );
+};
 
-      {/* Text Section */}
-      <div className="w-2/3 bg-indigo-700 text-white p-6 flex justify-center items-center">
-        <h3 className="text-2xl font-bold tracking-wider text-center">{title}</h3>
-      </div>
-    </div>
-  </button>
-);
-
-const HomeView = ({ onSelectCheck }) => {
+const HomeView = () => { // CHANGED: removed onSelectCheck prop
   return (
     <div className="min-h-screen bg-gradient-to-b from-indigo-100 via-white to-indigo-50">
 
@@ -42,14 +46,14 @@ const HomeView = ({ onSelectCheck }) => {
           title="Machine Quality Check"
           type="Machine"
           image="/checklist.jpg"
-          onSelectCheck={onSelectCheck}
+          route="/home/machine" // CHANGED: added route prop
         />
 
         <Card
           title="Employee Safety Check"
           type="PPE"
           image="/safetykit.jpg"
-          onSelectCheck={onSelectCheck}
+          route="/home/ppe" // CHANGED: added route prop
         />
       </div>
 

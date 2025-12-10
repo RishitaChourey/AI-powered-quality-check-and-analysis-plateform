@@ -1,13 +1,24 @@
 // src/components/Header.jsx
 import React, { useState } from 'react';
-// Assuming you have 'lucide-react' installed for icons (used in AboutView)
+import { useNavigate } from 'react-router-dom';
 
 /**
  * Header Component with conditional navigation and profile/auth icon.
  */
-const Header = ({ onNavigate, currentPage, checkType, isAuthenticated, onLogout }) => {
+const Header = ({ currentPage, checkType, isAuthenticated, onLogout }) => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
-
+  const navigate = useNavigate();
+  const routeMap = { // CHANGED
+    Dashboard: '/dashboard',
+    Home: '/home',
+    Notifications: '/notifications',
+    PPE: '/home/ppe',
+    Machine: '/home/machine',
+    About: '/about',
+    Login: '/',
+    Signup: '/signup',
+    ForgotPassword: '/forgot-password',
+  };
   const navItems = [
     { page: 'Dashboard', label: 'Dashboard' },
     { page: 'Home', label: 'Home' },
@@ -17,31 +28,24 @@ const Header = ({ onNavigate, currentPage, checkType, isAuthenticated, onLogout 
   const handleMenuClick = (action) => {
     setIsMenuOpen(false);
     if (action === 'Login') {
-      onNavigate('Login');
+      navigate('/');
     } else if (action === 'Logout') {
       onLogout();
     } else if (action === 'About') {
-      onNavigate('About');
+      navigate('/about');
     }
   };
 
-  // Determine the display label for the main navigation links
   const getNavLinkLabel = (itemPage) => {
     if (itemPage === 'Home' && currentPage === 'CheckPage') {
-      // Display the specific check type name (Machine/PPE) instead of 'Home'
       return checkType === 'Machine' ? 'Machine' : checkType === 'PPE' ? 'PPE' : 'Home';
     }
     return itemPage;
   };
 
   const getNavLinkIsActive = (itemPage) => {
-    // Standard pages
     if (currentPage === itemPage) return true;
-    
-    // Special case: When on CheckPage, highlight the 'Home' link 
-    // which serves as the base for Machine/PPE checks
     if (currentPage === 'CheckPage' && itemPage === 'Home') return true;
-    
     return false;
   };
   
@@ -59,7 +63,7 @@ const Header = ({ onNavigate, currentPage, checkType, isAuthenticated, onLogout 
           <div className="flex items-center">
             <span 
               className="text-2xl font-bold text-gray-800 cursor-pointer"
-              onClick={() => onNavigate(isAuthenticated ? 'Home' : 'Login')}
+              onClick={() => navigate(isAuthenticated ? '/home' : '/')}
             >
               TEIM
             </span>
@@ -73,7 +77,7 @@ const Header = ({ onNavigate, currentPage, checkType, isAuthenticated, onLogout 
                 {navItems.map((item) => (
                     <button
                       key={item.page}
-                      onClick={() => onNavigate(item.page)}
+                      onClick={() => navigate(routeMap[item.page])}
                       className={`
                         h-full flex items-center px-2 border-b-2 font-medium transition duration-150 ease-in-out
                         ${getNavLinkIsActive(item.page)
@@ -88,7 +92,7 @@ const Header = ({ onNavigate, currentPage, checkType, isAuthenticated, onLogout 
                 
                 {/* Always show About link in main nav */}
                 <button
-                    onClick={() => onNavigate('About')}
+                    onClick={() => navigate(routeMap.About)}
                     className={`
                         h-full flex items-center px-2 border-b-2 font-medium transition duration-150 ease-in-out
                         ${currentPage === 'About' 
@@ -106,7 +110,7 @@ const Header = ({ onNavigate, currentPage, checkType, isAuthenticated, onLogout 
                 publicNavItems.map((item) => (
                     <button
                         key={item.page}
-                        onClick={() => onNavigate(item.page)}
+                        onClick={() => navigate(routeMap[item.page])}
                         className={`
                             h-full flex items-center px-2 border-b-2 font-medium transition duration-150 ease-in-out
                             ${currentPage === item.page 
