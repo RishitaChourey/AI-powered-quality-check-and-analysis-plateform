@@ -1,9 +1,8 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from routers import google_auth
 
-from routers import auth, ppe, machine
+from routers import auth, ppe, machine,google_auth
 from db.database import init_db
 # -------------------------------
 app = FastAPI(title="PPE Detection + Auth API", version="1.0")
