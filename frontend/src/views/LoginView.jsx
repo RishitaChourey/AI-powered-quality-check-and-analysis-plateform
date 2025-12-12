@@ -1,11 +1,13 @@
 // src/views/LoginView.jsx
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 
-const LoginView = ({ onNavigate, onLoginSuccess }) => {
+const LoginView = ({ onLoginSuccess }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const navigate = useNavigate();
 
   const handleLogin = async (e) => {
     e.preventDefault();
@@ -25,7 +27,7 @@ const LoginView = ({ onNavigate, onLoginSuccess }) => {
 
     try {
       // Send login request to backend
-      const response = await fetch("http://127.0.0.1:5000/login", {
+      const response = await fetch("http://127.0.0.1:8000/api/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, password }),
@@ -90,7 +92,7 @@ const LoginView = ({ onNavigate, onLoginSuccess }) => {
           <div className="flex justify-between items-center text-sm">
             <button
               type="button"
-              onClick={() => onNavigate('ForgotPassword')}
+              onClick={() => navigate('/forgot-password')}
               className="text-white hover:text-indigo-200 transition duration-150"
             >
               Forgot Password?
@@ -114,7 +116,7 @@ const LoginView = ({ onNavigate, onLoginSuccess }) => {
           <p>
             New member? 
             <button 
-              onClick={() => onNavigate('Signup')}
+              onClick={() => navigate('/signup')}
               className="text-white font-semibold underline ml-1 hover:text-indigo-200 transition duration-150"
             >
               Sign Up
