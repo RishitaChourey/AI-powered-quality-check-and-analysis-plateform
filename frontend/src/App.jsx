@@ -24,7 +24,10 @@ const App = () => {
   const [user, setUser] = useState(null);
 
   const handleLoginSuccess = (userData) => {
-    setUser(userData);
+    setUser({
+      email: userData.email,
+      name: userData.name || 'Google User',
+    });
     setIsLoggedIn(true);
   };
 
