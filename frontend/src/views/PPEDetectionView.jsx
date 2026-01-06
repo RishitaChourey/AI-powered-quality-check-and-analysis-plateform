@@ -19,6 +19,7 @@ const PPEDetectionView = () => {
   const [summary, setSummary] = useState({});
   const [processedImageUrl, setProcessedImageUrl] = useState(null);
   const [error, setError] = useState(null);
+  const [detectedFrames, setDetectedFrames] = useState([]);
 
   // Handle file input
   const handleFileChange = (e) => {
@@ -62,10 +63,29 @@ const PPEDetectionView = () => {
       });
 
       const data = res.data;
-      setDetections(data.detections || []);
-      setSummary(data.summary || {});
-      if (data.original_image) setOriginalMedia(`http://127.0.0.1:8000${data.original_image}`);
-      if (data.annotated_image) setAnnotatedMedia(`http://127.0.0.1:8000${data.annotated_image}`);
+      if (data.detected_frames) {
+        setDetectedFrames(
+          data.detected_frames.map(
+            f => `http://127.0.0.1:8000${f}`
+          )
+        );
+      } else {
+          setDetectedFrames([]);
+      }
+
+      setDetections([]); // no per-box detections for video
+      setSummary(data.violations || {});
+      if (data.is_video && data.uploaded_file) {
+        setOriginalMedia(`http://127.0.0.1:8000${data.uploaded_file}`);
+        setAnnotatedMedia(null);
+      } else {
+          if (data.original_image) {
+            setOriginalMedia(`http://127.0.0.1:8000${data.original_image}`);
+          }
+          if (data.annotated_image) {
+            setAnnotatedMedia(`http://127.0.0.1:8000${data.annotated_image}`);
+          }
+        }
 
       setProgress(100);
     } catch (err) {
@@ -161,20 +181,31 @@ const PPEDetectionView = () => {
         )}
       </div>
 
-      {detections.length > 0 && (
+      {Object.keys(summary).length > 0 && (
         <div className="mt-8 bg-white p-6 rounded-lg shadow-lg w-full max-w-2xl">
           <h3 className="text-2xl font-semibold mb-4 text-gray-800">Detections</h3>
           {Object.keys(summary).length > 0 && (
             <div className="mt-4">
-              <h4 className="text-lg font-semibold text-gray-800 mb-2">Summary</h4>
-              <ul className="grid grid-cols-2 md:grid-cols-3 gap-2">
-                {Object.entries(summary).map(([cls, count]) => (
-                  <li key={cls} className="bg-gray-100 px-3 py-1 rounded">
-                    <span className="font-medium text-gray-700">{cls}</span>
-                    <span className="float-right text-blue-600 font-semibold">{count}</span>
-                  </li>
-                ))}
-              </ul>
+              <h4 className="text-lg font-semibold text-gray-800 mb-3">
+  PPE Violations Summary
+</h4>
+
+<div className="space-y-3">
+  {Object.entries(summary).map(([person, violations]) => (
+    <div
+      key={person}
+      className="border rounded-lg p-3 bg-red-50"
+    >
+      <p className="font-semibold text-gray-800">{person}</p>
+      <ul className="list-disc list-inside text-red-600">
+        {violations.map((v, idx) => (
+          <li key={idx}>{v}</li>
+        ))}
+      </ul>
+    </div>
+  ))}
+</div>
+
             </div>
           )}
         </div>
@@ -204,6 +235,28 @@ const PPEDetectionView = () => {
           )}
         </div>
       )}
+
+
+      {detectedFrames.length > 0 && (
+  <div className="mt-10 bg-white p-6 rounded-lg shadow-lg w-full max-w-5xl">
+    <h3 className="text-2xl font-semibold mb-4 text-gray-800">
+      Detected Frames
+    </h3>
+
+    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      {detectedFrames.map((src, idx) => (
+        <div key={idx} className="border rounded-lg overflow-hidden">
+          <img
+            src={src}
+            alt={`Frame ${idx}`}
+            className="w-full h-40 object-cover hover:scale-105 transition-transform"
+          />
+        </div>
+      ))}
+    </div>
+  </div>
+)}
+
     </div>
   );
 };
