@@ -50,7 +50,13 @@ async def dashboard_summary():
 
     # --- PPE Compliance calculation ---
     total = sum(r["count"] for r in class_rows)
-    violations = sum(r["count"] for r in class_rows if r["class_name"].startswith("no_"))
+    # Define violation keywords
+    NEGATIVE_TOKENS = ["no", "missing", "without", "incorrect"]
+    violations = sum(
+    int(r["count"])  # ensure integer
+    for r in class_rows
+    if r.get("class_name") and  # make sure not None
+       any(token in r["class_name"].lower() for token in NEGATIVE_TOKENS))
     compliance = round(((total - violations) / total) * 100, 2) if total > 0 else 100
 
     # --- Machine Compliance calculation ---
