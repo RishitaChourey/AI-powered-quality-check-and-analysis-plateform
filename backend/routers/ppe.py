@@ -3,10 +3,12 @@ from fastapi.responses import JSONResponse
 import shutil, os, re, glob
 from collections import Counter
 import asyncio
+import json
 
 from services.yolo_service import run_ppe_detection, ppe_model
 from services.video_utils import convert_avi_to_mp4
 from services.email_utils.ppe_email import send_ppe_email  # wrapper
+from db.database import update_class_summary, get_connection 
 
 router = APIRouter()
 
@@ -47,6 +49,22 @@ async def predict(file: UploadFile = File(...), background_tasks: BackgroundTask
 
         # Summary
         summary = dict(Counter([d["class"] for d in detections]))
+
+         # Update class_summary in SQLite
+        update_class_summary(summary)
+        conn = get_connection()
+        c = conn.cursor()
+        c.execute(
+            "INSERT INTO notifications (type, title, message, summary) VALUES (?, ?, ?, ?)",
+            (
+                "ppe",
+                "PPE Detection Completed",
+                "Please take immediate action to ensure workplace safety and compliance.",
+                json.dumps(summary)
+            )
+        )
+        conn.commit()
+        conn.close()
 
          # PPE Negative filtering logic
         PPE_NEGATIVE = [

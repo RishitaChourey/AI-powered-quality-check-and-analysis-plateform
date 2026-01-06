@@ -10,17 +10,22 @@ else:
     print("✅ Database file found!")
     conn = sqlite3.connect(db_path, check_same_thread=False, timeout=10)
     c = conn.cursor()
+
+    # List all tables
     c.execute("SELECT name FROM sqlite_master WHERE type='table';")
-    tables = c.fetchall()
+    tables = [t[0] for t in c.fetchall()]
     print(f"Tables found: {tables}")
 
-    if ('users',) not in tables:
-        print("❌ 'users' table not found.")
-    else:
-        c.execute("SELECT * FROM users")
-        rows = c.fetchall()
-        print(f"Rows in 'users' table: {len(rows)}")
-        for row in rows:
-            print(row)
+    # Inspect each table
+    for table in tables:
+        print(f"\n--- Checking table: {table} ---")
+        try:
+            c.execute(f"SELECT * FROM {table}")
+            rows = c.fetchall()
+            print(f"Rows in '{table}': {len(rows)}")
+            for row in rows:
+                print(row)
+        except Exception as e:
+            print(f"Error reading {table}: {e}")
 
     conn.close()

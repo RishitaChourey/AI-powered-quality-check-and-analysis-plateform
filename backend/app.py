@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
-from routers import auth, ppe, machine
+from routers import auth, ppe, machine, dashboard, notifications
 from db.database import init_db
 # -------------------------------
 app = FastAPI(title="PPE Detection + Auth API", version="1.0")
@@ -27,6 +27,8 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 app.include_router(auth.router, prefix="/api", tags=["auth"])
 app.include_router(ppe.router, prefix="/predict", tags=["ppe"])
 app.include_router(machine.router, prefix="/predict_machine", tags=["machine"])
+app.include_router(dashboard.router)
+app.include_router(notifications.router)
 
 @app.get("/")
 def root():
