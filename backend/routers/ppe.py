@@ -40,18 +40,25 @@ async def predict(
         if is_video:
             result = process_video_for_ppe(upload_path)
             summary_source = result.get("final_ppe_summary", {})
+            unknowns_summary = result.get("unknowns_summary", {})
         else:
             result = process_image_for_ppe(upload_path)
             summary_source = {}
-
+            unknown_ppe = set()
             # Build summary from image result
             for person in result.get("persons", []):
                 name = person["name"]
                 if name == "Unknown":
-                    continue
+                    for ppe in person["ppe"]:
+                      unknown_ppe.add(ppe)
+                continue
                 summary_source.setdefault(name, [])
                 summary_source[name].extend(person["ppe"])
 
+            unknowns_summary = {
+                "total_unknown_detections": len(unknown_ppe),
+                "ppe_detected": list(unknown_ppe)
+            }
         frames = result.get("frames", [])
 
         # ---------------- NEGATIVE PPE EXTRACTION ---------------- #
@@ -62,6 +69,15 @@ async def predict(
             if negative_items:
                 violations[name] = list(set(negative_items))
 
+        # -------- Unknown persons --------
+        unknown_negative = [
+           p for p in unknowns_summary.get("ppe_detected", [])
+           if p in PPE_NEGATIVE
+        ]
+
+        if unknown_negative:
+           violations["Unknown"] = list(set(unknown_negative))
+           
         # ---------------- EMAIL (ASYNC) ---------------- #
         if violations and background_tasks:
             background_tasks.add_task(
@@ -87,7 +103,9 @@ async def predict(
 
             # final PPE violations
             "violations": violations,
+            "unknowns_summary": unknowns_summary,
             "original_image": None if is_video else f"/static/uploads/{safe_filename}"
+
         })
 
 

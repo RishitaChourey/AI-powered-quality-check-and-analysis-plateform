@@ -16,6 +16,7 @@ from services.yolo_service import (
 FACE_THRESHOLD = 0.30
 FRAME_INTERVAL = 100
 EMBED_DIR = "face_embeddings"
+
 DETECTIONS_DIR = "static/detections"
 os.makedirs(DETECTIONS_DIR, exist_ok=True)
 
@@ -116,6 +117,8 @@ def process_video_for_ppe(video_path: str) -> Dict:
     per_frame_results = []
     global_ppe_summary = {}
     saved_frames = []
+    unknown_count = 0
+    unknown_ppe_summary = set()
 
     while True:
         ret, frame = cap.read()
@@ -164,6 +167,9 @@ def process_video_for_ppe(video_path: str) -> Dict:
         for person in persons:
             name = person["name"]
             if name == "Unknown":
+                unknown_count += 1
+                for ppe in person["ppe"]:
+                  unknown_ppe_summary.add(ppe)
                 continue
 
             global_ppe_summary.setdefault(name, set())
@@ -184,6 +190,10 @@ def process_video_for_ppe(video_path: str) -> Dict:
         "total_frames_processed": len(saved_frames),
         "final_ppe_summary": {
             k: list(v) for k, v in global_ppe_summary.items()
+        },
+        "unknowns_summary": {
+            "total_unknown_detections": unknown_count,
+            "ppe_detected": list(unknown_ppe_summary)
         }
     }
 
