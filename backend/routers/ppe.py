@@ -51,7 +51,7 @@ async def predict(
                 if name == "Unknown":
                     for ppe in person["ppe"]:
                       unknown_ppe.add(ppe)
-                continue
+                    continue
                 summary_source.setdefault(name, [])
                 summary_source[name].extend(person["ppe"])
 
@@ -59,6 +59,7 @@ async def predict(
                 "total_unknown_detections": len(unknown_ppe),
                 "ppe_detected": list(unknown_ppe)
             }
+
         frames = result.get("frames", [])
 
         # ---------------- NEGATIVE PPE EXTRACTION ---------------- #
@@ -104,10 +105,15 @@ async def predict(
                 continue  # skip unknown for now, or handle separately if needed
 
                for ppe in person.get("ppe", []):
-                violation_tracker.setdefault(ppe, set()).add(name)
+                if ppe in PPE_NEGATIVE:
+                    violation_tracker.setdefault(ppe, set()).add(name)
 
             summary = {ppe: len(names) for ppe, names in violation_tracker.items()}
-
+        
+        # -------- ADD UNKNOWN CONTRIBUTION (OPTIONAL, BUT CORRECT) --------
+        for ppe in unknowns_summary.get("ppe_detected", []):
+            if ppe in PPE_NEGATIVE:
+               summary[ppe] = summary.get(ppe, 0) + 1
 
         # ---------------- RESPONSE ---------------- #
         return JSONResponse({
