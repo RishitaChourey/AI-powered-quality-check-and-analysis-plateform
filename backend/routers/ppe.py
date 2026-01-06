@@ -86,6 +86,28 @@ async def predict(
                 subject="🚨 PPE Violation Alert",
                 violations=violations
             )
+        
+        # ---------------- SUMMARY ---------------- #
+        summary = {}
+
+        # Use final PPE counts from video/image result if available
+        if is_video:
+        # Use the new "ppe_counts_per_person" from process_video_for_ppe
+            summary = result.get("ppe_counts_per_person", {})
+        else:
+            # For image, we compute similarly from persons list
+            violation_tracker = {}  # ppe -> set(person_name)
+
+            for person in result.get("persons", []):
+               name = person["name"]
+               if name == "Unknown":
+                continue  # skip unknown for now, or handle separately if needed
+
+               for ppe in person.get("ppe", []):
+                violation_tracker.setdefault(ppe, set()).add(name)
+
+            summary = {ppe: len(names) for ppe, names in violation_tracker.items()}
+
 
         # ---------------- RESPONSE ---------------- #
         return JSONResponse({
@@ -100,7 +122,7 @@ async def predict(
 
             # full structured data (for future use)
             "data": result,
-
+            "summary": summary, 
             # final PPE violations
             "violations": violations,
             "unknowns_summary": unknowns_summary,

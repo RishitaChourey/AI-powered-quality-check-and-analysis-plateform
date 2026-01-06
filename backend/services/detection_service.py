@@ -119,7 +119,7 @@ def process_video_for_ppe(video_path: str) -> Dict:
     saved_frames = []
     unknown_count = 0
     unknown_ppe_summary = set()
-
+    violation_tracker = {}   # ppe_label -> set(person_name)
     while True:
         ret, frame = cap.read()
         if not ret:
@@ -175,11 +175,19 @@ def process_video_for_ppe(video_path: str) -> Dict:
             global_ppe_summary.setdefault(name, set())
             for ppe in person["ppe"]:
                 global_ppe_summary[name].add(ppe)
+                # -------- GLOBAL PER-PPE PER-PERSON COUNT -------- #
+                violation_tracker.setdefault(ppe, set())
+                violation_tracker[ppe].add(name)
 
         per_frame_results.append({
             "frame": frame_count,
             "persons": persons
         })
+    final_ppe_counts = {
+        ppe: len(person_set)
+        for ppe, person_set in violation_tracker.items()
+    }
+
 
     cap.release()
 
@@ -194,7 +202,8 @@ def process_video_for_ppe(video_path: str) -> Dict:
         "unknowns_summary": {
             "total_unknown_detections": unknown_count,
             "ppe_detected": list(unknown_ppe_summary)
-        }
+        },
+        "ppe_counts_per_person": final_ppe_counts
     }
 
 
@@ -248,4 +257,3 @@ def process_image_for_ppe(image_path: str) -> Dict:
         "frames": [f"/static/detections/{img_name}"],
         "persons": persons
     }
-

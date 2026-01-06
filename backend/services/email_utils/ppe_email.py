@@ -33,8 +33,8 @@ async def send_ppe_email(to, subject, violations: Dict[str, int]):
             <table style="width: 100%; border-collapse: collapse; margin-top: 10px;">
                 <thead>
                     <tr style="background-color: #f8d7da;">
-                        <th style="padding: 10px; text-align: left;">PPE Item</th>
-                        <th style="padding: 10px; text-align: center;">Count</th>
+                        <th style="padding: 10px; text-align: left;">Name</th>
+                        <th style="padding: 10px; text-align: center;">PPE items</th>
                     </tr>
                 </thead>
                 <tbody>
