@@ -2,10 +2,12 @@ from fastapi import APIRouter, UploadFile, File, BackgroundTasks
 from fastapi.responses import JSONResponse
 import shutil, os, glob
 from collections import Counter
+import json
 
 from services.yolo_service import run_machine_detection, machine_model
 from services.video_utils import convert_avi_to_mp4
-from services.email_utils.machine_email import send_machine_email_sync  # <- updated
+from services.email_utils.machine_email import send_machine_email_sync
+from db.database import update_class_summary, update_checkpoint_summary, save_machine_summary, get_connection
 
 router = APIRouter()
 
@@ -47,6 +49,27 @@ async def predict_machine(file: UploadFile = File(...), background_tasks: Backgr
             {"name": cls_name, "passed": summary.get(cls_name, 0) > 0}
             for cls_name in expected_classes
         ]
+
+        # Update database tables
+        update_checkpoint_summary(checkpoints)  # cumulative checkpoint pass/fail
+        save_machine_summary("Machine Type A", file.filename, checkpoints)  # per-run machine stats
+
+        failed_items = [cp["name"] for cp in checkpoints if not cp["passed"]]
+
+        conn = get_connection()
+        c = conn.cursor()
+        c.execute(
+            "INSERT INTO notifications (type, title, message, summary, failed_items) VALUES (?, ?, ?, ?, ?)",
+            (
+                "machine",
+                "Machine Checkpoint Failure" if failed_items else "Machine Checkpoint Passed",
+                "Please take immediate action to ensure workplace safety and compliance.",
+                json.dumps(summary),
+                json.dumps(failed_items)
+            )
+        )
+        conn.commit()
+        conn.close()
 
         # Auto Email if any checkpoint failed
         if background_tasks:

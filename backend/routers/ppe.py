@@ -1,12 +1,19 @@
 from fastapi import APIRouter, UploadFile, File, BackgroundTasks
 from fastapi.responses import JSONResponse
-import shutil, os, re
+import shutil, os, re, json
+from collections import Counter
 
+# New detection services
 from services.detection_service import (
     process_video_for_ppe,
     process_image_for_ppe
 )
+
+# Email utility
 from services.email_utils.ppe_email import send_ppe_email
+
+# Database utilities (kept from old version)
+from db.database import update_class_summary, get_connection
 
 router = APIRouter()
 
@@ -50,7 +57,7 @@ async def predict(
                 name = person["name"]
                 if name == "Unknown":
                     for ppe in person["ppe"]:
-                      unknown_ppe.add(ppe)
+                        unknown_ppe.add(ppe)
                     continue
                 summary_source.setdefault(name, [])
                 summary_source[name].extend(person["ppe"])
@@ -64,21 +71,19 @@ async def predict(
 
         # ---------------- NEGATIVE PPE EXTRACTION ---------------- #
         violations = {}
-
         for name, ppe_list in summary_source.items():
             negative_items = [p for p in ppe_list if p in PPE_NEGATIVE]
             if negative_items:
                 violations[name] = list(set(negative_items))
 
-        # -------- Unknown persons --------
+        # Unknown persons
         unknown_negative = [
-           p for p in unknowns_summary.get("ppe_detected", [])
-           if p in PPE_NEGATIVE
+            p for p in unknowns_summary.get("ppe_detected", [])
+            if p in PPE_NEGATIVE
         ]
-
         if unknown_negative:
-           violations["Unknown"] = list(set(unknown_negative))
-           
+            violations["Unknown"] = list(set(unknown_negative))
+
         # ---------------- EMAIL (ASYNC) ---------------- #
         if violations and background_tasks:
             background_tasks.add_task(
@@ -87,55 +92,50 @@ async def predict(
                 subject="🚨 PPE Violation Alert",
                 violations=violations
             )
-        
-        # ---------------- SUMMARY ---------------- #
-        summary = {}
 
-        # Use final PPE counts from video/image result if available
+        # ---------------- DATABASE SUMMARY (OLD LOGIC) ---------------- #
+        # Flatten detections for DB update
+        detections = []
         if is_video:
-        # Use the new "ppe_counts_per_person" from process_video_for_ppe
-            summary = result.get("ppe_counts_per_person", {})
+            # Use per-person PPE list from video summary
+            for person, ppe_list in summary_source.items():
+                for ppe in ppe_list:
+                    detections.append({"class": ppe})
         else:
-            # For image, we compute similarly from persons list
-            violation_tracker = {}  # ppe -> set(person_name)
-
             for person in result.get("persons", []):
-               name = person["name"]
-               if name == "Unknown":
-                continue  # skip unknown for now, or handle separately if needed
+                for ppe in person.get("ppe", []):
+                    detections.append({"class": ppe})
 
-               for ppe in person.get("ppe", []):
-                if ppe in PPE_NEGATIVE:
-                    violation_tracker.setdefault(ppe, set()).add(name)
+        summary = dict(Counter([d["class"] for d in detections]))
 
-            summary = {ppe: len(names) for ppe, names in violation_tracker.items()}
-        
-        # -------- ADD UNKNOWN CONTRIBUTION (OPTIONAL, BUT CORRECT) --------
-        for ppe in unknowns_summary.get("ppe_detected", []):
-            if ppe in PPE_NEGATIVE:
-               summary[ppe] = summary.get(ppe, 0) + 1
+        # Update class_summary in SQLite
+        update_class_summary(summary)
+        conn = get_connection()
+        c = conn.cursor()
+        c.execute(
+            "INSERT INTO notifications (type, title, message, summary) VALUES (?, ?, ?, ?)",
+            (
+                "ppe",
+                "PPE Detection Completed",
+                "Please take immediate action to ensure workplace safety and compliance.",
+                json.dumps(summary)
+            )
+        )
+        conn.commit()
+        conn.close()
 
         # ---------------- RESPONSE ---------------- #
         return JSONResponse({
             "success": True,
             "is_video": is_video,
-
-            # original uploaded media
             "uploaded_file": f"/static/uploads/{safe_filename}",
-
-            # detected frames / images
             "detected_frames": frames,
-
-            # full structured data (for future use)
             "data": result,
-            "summary": summary, 
-            # final PPE violations
-            "violations": violations,
+            "summary": summary,              # flat counts for DB/dashboard
+            "violations": violations,        # structured per-person
             "unknowns_summary": unknowns_summary,
             "original_image": None if is_video else f"/static/uploads/{safe_filename}"
-
         })
-
 
     except Exception as e:
         return JSONResponse(
