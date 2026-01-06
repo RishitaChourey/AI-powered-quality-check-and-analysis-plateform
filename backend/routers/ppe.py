@@ -1,56 +1,114 @@
 from fastapi import APIRouter, UploadFile, File, BackgroundTasks
 from fastapi.responses import JSONResponse
-import shutil, os, re, glob
+import shutil, os, re, json
 from collections import Counter
-import asyncio
-import json
 
-from services.yolo_service import run_ppe_detection, ppe_model
-from services.video_utils import convert_avi_to_mp4
-from services.email_utils.ppe_email import send_ppe_email  # wrapper
-from db.database import update_class_summary, get_connection 
+# New detection services
+from services.detection_service import (
+    process_video_for_ppe,
+    process_image_for_ppe
+)
+
+# Email utility
+from services.email_utils.ppe_email import send_ppe_email
+
+# Database utilities (kept from old version)
+from db.database import update_class_summary, get_connection
 
 router = APIRouter()
 
+# PPE classes considered as violations
+PPE_NEGATIVE = {
+    "no-helmet",
+    "no-vest",
+    "no-goggles",
+    "no-gloves",
+    "no-shoes"
+}
+
+
 @router.post("/")
-async def predict(file: UploadFile = File(...), background_tasks: BackgroundTasks = None):
+async def predict(
+    file: UploadFile = File(...),
+    background_tasks: BackgroundTasks = None
+):
     try:
-        # Sanitize filename
+        # ---------------- SAVE FILE ---------------- #
         safe_filename = re.sub(r'[^a-zA-Z0-9_.-]', '_', file.filename)
         os.makedirs("static/uploads", exist_ok=True)
-        upload_path = f"static/uploads/{safe_filename}"
+
+        upload_path = os.path.join("static/uploads", safe_filename)
         with open(upload_path, "wb") as buffer:
             shutil.copyfileobj(file.file, buffer)
 
-        # Detect if video
         is_video = file.content_type.startswith("video/")
 
-        # Run YOLO detection
-        results = run_ppe_detection(upload_path)
+        # ---------------- RUN DETECTION ---------------- #
+        if is_video:
+            result = process_video_for_ppe(upload_path)
+            summary_source = result.get("final_ppe_summary", {})
+            unknowns_summary = result.get("unknowns_summary", {})
+        else:
+            result = process_image_for_ppe(upload_path)
+            summary_source = {}
+            unknown_ppe = set()
+            # Build summary from image result
+            for person in result.get("persons", []):
+                name = person["name"]
+                if name == "Unknown":
+                    for ppe in person["ppe"]:
+                        unknown_ppe.add(ppe)
+                    continue
+                summary_source.setdefault(name, [])
+                summary_source[name].extend(person["ppe"])
 
-        # Extract detections
+            unknowns_summary = {
+                "total_unknown_detections": len(unknown_ppe),
+                "ppe_detected": list(unknown_ppe)
+            }
+
+        frames = result.get("frames", [])
+
+        # ---------------- NEGATIVE PPE EXTRACTION ---------------- #
+        violations = {}
+        for name, ppe_list in summary_source.items():
+            negative_items = [p for p in ppe_list if p in PPE_NEGATIVE]
+            if negative_items:
+                violations[name] = list(set(negative_items))
+
+        # Unknown persons
+        unknown_negative = [
+            p for p in unknowns_summary.get("ppe_detected", [])
+            if p in PPE_NEGATIVE
+        ]
+        if unknown_negative:
+            violations["Unknown"] = list(set(unknown_negative))
+
+        # ---------------- EMAIL (ASYNC) ---------------- #
+        if violations and background_tasks:
+            background_tasks.add_task(
+                send_ppe_email,
+                to=["industryproject87@gmail.com"],
+                subject="🚨 PPE Violation Alert",
+                violations=violations
+            )
+
+        # ---------------- DATABASE SUMMARY (OLD LOGIC) ---------------- #
+        # Flatten detections for DB update
         detections = []
-        for r in results:
-            for box in r.boxes:
-                detections.append({
-                    "class": ppe_model.names[int(box.cls)],
-                    "confidence": float(box.conf)
-                })
+        if is_video:
+            # Use per-person PPE list from video summary
+            for person, ppe_list in summary_source.items():
+                for ppe in ppe_list:
+                    detections.append({"class": ppe})
+        else:
+            for person in result.get("persons", []):
+                for ppe in person.get("ppe", []):
+                    detections.append({"class": ppe})
 
-        # Find annotated file
-        base_name = os.path.splitext(safe_filename)[0]
-        detected_files = glob.glob(f"static/detections/{base_name}*.*")
-        annotated_path = None
-        if detected_files:
-            annotated_path = detected_files[0].replace("\\", "/")
-            if annotated_path.endswith(".avi"):
-                annotated_path = convert_avi_to_mp4(annotated_path)
-            annotated_path = "/" + annotated_path
-
-        # Summary
         summary = dict(Counter([d["class"] for d in detections]))
 
-         # Update class_summary in SQLite
+        # Update class_summary in SQLite
         update_class_summary(summary)
         conn = get_connection()
         c = conn.cursor()
@@ -66,34 +124,21 @@ async def predict(file: UploadFile = File(...), background_tasks: BackgroundTask
         conn.commit()
         conn.close()
 
-         # PPE Negative filtering logic
-        PPE_NEGATIVE = [
-            "no_helmet",
-            "no_vest",
-            "no_goggles",
-            "no_glove",
-            "no_shoes"
-        ]
-
-        # Only keep negative violations
-        negative = {cls: count for cls, count in summary.items() if cls in PPE_NEGATIVE}
-
-        # Send email ONLY if negative detected
-        if negative and background_tasks:
-            background_tasks.add_task(
-                send_ppe_email,
-                to=["industryproject87@gmail.com"],
-                subject="PPE Violation Alert",
-                violations=negative
-            )
-
+        # ---------------- RESPONSE ---------------- #
         return JSONResponse({
-            "detections": detections,
-            "summary": summary,
-            "original_image": f"/static/uploads/{safe_filename}",
-            "annotated_image": annotated_path,
-            "is_video": is_video
+            "success": True,
+            "is_video": is_video,
+            "uploaded_file": f"/static/uploads/{safe_filename}",
+            "detected_frames": frames,
+            "data": result,
+            "summary": summary,              # flat counts for DB/dashboard
+            "violations": violations,        # structured per-person
+            "unknowns_summary": unknowns_summary,
+            "original_image": None if is_video else f"/static/uploads/{safe_filename}"
         })
 
     except Exception as e:
-        return JSONResponse({"error": str(e)}, status_code=500)
+        return JSONResponse(
+            {"success": False, "error": str(e)},
+            status_code=500
+        )
