@@ -1,20 +1,98 @@
 // src/views/DashboardView.jsx
+import React, { useEffect, useState } from "react";
+import { Bar, Pie } from "react-chartjs-2";
+import {
+  Chart as ChartJS,
+  ArcElement,
+  Tooltip,
+  Legend,
+  CategoryScale,
+  LinearScale,
+  BarElement,
+} from "chart.js";
 
-import React from 'react';
-import { useNavigate } from 'react-router-dom';
+ChartJS.register(ArcElement, Tooltip, Legend, CategoryScale, LinearScale, BarElement);
 
-/**
- * Dashboard View (Design a2.jpg)
- */
 const DashboardView = () => {
-  const StatCircle = ({ percent, title, color }) => (
+  const [classSummary, setClassSummary] = useState([]);
+  const [checkpointSummary, setCheckpointSummary] = useState([]);
+  const [compliance, setCompliance] = useState(100);
+  const [violations, setViolations] = useState(0);
+  const [total, setTotal] = useState(0);
+
+  useEffect(() => {
+    const fetchData = async () => {
+      const res = await fetch("http://127.0.0.1:8000/api/dashboard");
+      const data = await res.json();
+      setClassSummary(data.class_summary || []);
+      setCheckpointSummary(data.checkpoint_summary || []);
+      setCompliance(data.compliance ?? 100);
+      setViolations(data.violations ?? 0);
+      setTotal(data.total ?? 0);
+    };
+    fetchData();
+    const interval = setInterval(fetchData, 10000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const StatCircle = ({ value, title, color }) => (
     <div className="flex flex-col items-center p-4">
       <div className={`relative w-28 h-28 flex items-center justify-center rounded-full border-4 ${color}`}>
-        <span className="text-xl font-bold text-gray-800">{percent}</span>
+        <span className="text-xl font-bold text-gray-800">{value}</span>
       </div>
       <p className="mt-2 text-sm text-gray-500">{title}</p>
     </div>
   );
+
+  // Split PPE classes into positives vs negatives
+  const positiveClasses = classSummary.filter((c) => !c.class_name.startsWith("no_"));
+  const negativeClasses = classSummary.filter((c) => c.class_name.startsWith("no_"));
+
+  // Pie chart data (positive PPE)
+  const positivePieData = {
+    labels: positiveClasses.map((c) => c.class_name),
+    datasets: [
+      {
+        data: positiveClasses.map((c) => c.count),
+        backgroundColor: [
+          "rgba(34, 197, 94, 0.9)", // green shades
+          "rgba(22, 163, 74, 0.8)",
+          "rgba(134, 239, 172, 0.8)",
+          "rgba(187, 247, 208, 0.8)",
+          "rgba(16, 185, 129, 0.8)",
+        ],
+      },
+    ],
+  };
+
+  // Pie chart data (negative PPE)
+  const negativePieData = {
+    labels: negativeClasses.map((c) => c.class_name),
+    datasets: [
+      {
+        data: negativeClasses.map((c) => c.count),
+        backgroundColor: [
+          "rgba(239, 68, 68, 0.9)", // red shades
+          "rgba(220, 38, 38, 0.8)",
+          "rgba(252, 165, 165, 0.8)",
+          "rgba(254, 202, 202, 0.8)",
+          "rgba(153, 27, 27, 0.8)",
+        ],
+      },
+    ],
+  };
+
+  // Bar chart data (machine checkpoint failures)
+  const checkpointBarData = {
+    labels: checkpointSummary.map((cp) => cp.checkpoint_name),
+    datasets: [
+      {
+        label: "Failed Count",
+        data: checkpointSummary.map((cp) => cp.failed_count),
+        backgroundColor: "rgba(239, 68, 68, 0.7)", // red bars
+      },
+    ],
+  };
 
   return (
     <div className="max-w-6xl mx-auto p-6">
@@ -22,52 +100,27 @@ const DashboardView = () => {
 
       {/* Metric Circles */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-10">
-        <StatCircle percent="70%" title="02" color="border-blue-500 text-blue-700" />
-        <StatCircle percent="50%" title="01" color="border-blue-500 text-blue-700" />
-        <StatCircle percent="80%" title="03" color="border-blue-500 text-blue-700" />
-        <StatCircle percent="100%" title="04" color="border-blue-500 text-blue-700" />
+        <StatCircle value={`${compliance}%`} title="Compliance %" color="border-green-500 text-green-700" />
+        <StatCircle value={violations} title="Violations" color="border-red-500 text-red-700" />
+        <StatCircle value={total} title="Total Detections" color="border-blue-500 text-blue-700" />
       </div>
 
-      {/* Placeholder for Graphs */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        {/* Pie Chart Placeholder */}
+      {/* PPE Pie Charts side by side */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
         <div className="bg-white p-6 rounded-xl shadow-lg border border-gray-100">
-          <h4 className="text-lg font-semibold mb-4 text-gray-700">Statistic Graph (Compliance Breakdown)</h4>
-          <div className="h-64 bg-gray-100 flex items-center justify-center rounded-lg">
-            {/* Simple Pie Chart Representation */}
-            <div className="w-40 h-40 rounded-full bg-conic-gradient" style={{
-              backgroundImage: 'conic-gradient(rgb(30, 64, 175) 0% 50%, rgb(59, 130, 246) 50% 75%, rgb(147, 197, 253) 75% 100%)'
-            }}>
-              <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 text-white font-bold text-lg">
-                <span className="text-xs text-gray-800">01 (50%)</span>
-              </div>
-            </div>
-          </div>
-          <div className='flex justify-around mt-4 text-sm'>
-            <span className='text-blue-900'>01</span>
-            <span className='text-blue-600'>02</span>
-            <span className='text-blue-300'>03</span>
-          </div>
+          <h4 className="text-lg font-semibold mb-4 text-gray-700">Positive PPE Usage</h4>
+          <Pie data={positivePieData} />
         </div>
+        <div className="bg-white p-6 rounded-xl shadow-lg border border-gray-100">
+          <h4 className="text-lg font-semibold mb-4 text-gray-700">Negative PPE Violations</h4>
+          <Pie data={negativePieData} />
+        </div>
+      </div>
 
-        {/* Bar Chart Placeholder */}
-        <div className="bg-white p-6 rounded-xl shadow-lg border border-gray-100">
-          <h4 className="text-lg font-semibold mb-4 text-gray-700">Statistic Graph (Annual Trend)</h4>
-          <div className="h-64 bg-gray-100 flex items-end p-2 rounded-lg">
-            {/* Simple Bar Chart Representation */}
-            <div className="flex w-full h-full items-end justify-between space-x-1">
-              {[40, 60, 80, 50, 30, 70, 90, 95, 85, 75].map((h, index) => (
-                <div key={index} className="flex flex-col items-center">
-                  <div
-                    className="w-3 md:w-4 bg-indigo-700 rounded-t-sm transition-all duration-500"
-                    style={{ height: `${h}%` }}
-                  ></div>
-                  <span className='text-xs text-gray-600 mt-1'>{2012 + index}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
+      {/* Machine Checkpoint Failures Bar Chart */}
+      <div className="bg-white p-6 rounded-xl shadow-lg border border-gray-100">
+        <h4 className="text-lg font-semibold mb-4 text-gray-700">Machine Checkpoint Failures</h4>
+        <Bar data={checkpointBarData} />
       </div>
     </div>
   );
