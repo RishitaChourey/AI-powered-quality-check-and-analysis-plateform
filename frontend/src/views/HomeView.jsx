@@ -2,6 +2,7 @@
 import React from "react";
 import { CheckCircle, Shield, Cpu } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import Footer from ".//Footer"; 
 
 const Card = ({ title, image, type, route }) => {
   const navigate = useNavigate(); // CHANGED: use navigate instead of onSelectCheck
@@ -91,10 +92,7 @@ const HomeView = () => { // CHANGED: removed onSelectCheck prop
         </div>
       </section>
 
-      {/* Footer */}
-      <footer className="py-6 text-center text-gray-500 text-sm">
-        © {new Date().getFullYear()} Surveillance & Quality Assurance — All Rights Reserved.
-      </footer>
+      <Footer />
     </div>
   );
 };

@@ -1,7 +1,7 @@
 import React from 'react';
 import { Mail, Shield, Zap, Info } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-
+import Footer from ".//Footer"; 
 const AboutView = () => {
   const navigate = useNavigate();
   return (
@@ -66,7 +66,7 @@ const AboutView = () => {
               If you are not yet logged in, access the platform to start using our AI services.
             </p>
             <button
-              onClick={() => navigate('/')}
+              onClick={() => navigate('/login')}
               className="bg-indigo-600 text-white font-bold py-3 px-8 rounded-lg shadow-lg hover:bg-indigo-700 transition duration-300 transform hover:scale-105"
             >
               Go to Login
@@ -75,6 +75,7 @@ const AboutView = () => {
 
         </section>
       </div>
+      <Footer />
     </div>
   );
 };

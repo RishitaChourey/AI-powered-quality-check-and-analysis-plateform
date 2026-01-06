@@ -13,6 +13,7 @@ import NotificationsView from './views/NotificationsView';
 import AboutView from './views/AboutView';
 import PPEDetectionView from './views/PPEDetectionView';
 import MachineDetectionView from './views/MachineDetectionView';
+import LandingPage from "./views/LandingPage";
 
 // Authentication Views
 import LoginView from './views/LoginView';
@@ -46,8 +47,9 @@ const App = () => {
           <div className='pb-12'>
             <Routes>
               {/* Public Routes */}
+              <Route path="/" element={<LandingPage />} />
               <Route
-                path='/'
+                path='/login'
                 element={
                   isLoggedIn ? <Navigate to='/home' /> : (
                     <LoginView onLoginSuccess={handleLoginSuccess} />

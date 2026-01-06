@@ -15,7 +15,7 @@ const Header = ({ currentPage, checkType, isAuthenticated, onLogout }) => {
     PPE: '/home/ppe',
     Machine: '/home/machine',
     About: '/about',
-    Login: '/',
+    Login: '/login',
     Signup: '/signup',
     ForgotPassword: '/forgot-password',
   };
@@ -28,7 +28,7 @@ const Header = ({ currentPage, checkType, isAuthenticated, onLogout }) => {
   const handleMenuClick = (action) => {
     setIsMenuOpen(false);
     if (action === 'Login') {
-      navigate('/');
+      navigate('/login');
     } else if (action === 'Logout') {
       onLogout();
     } else if (action === 'About') {

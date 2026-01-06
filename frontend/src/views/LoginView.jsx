@@ -1,7 +1,7 @@
 // src/views/LoginView.jsx
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-
+import Footer from ".//Footer";
 const LoginView = ({ onLoginSuccess }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');

@@ -13,7 +13,7 @@ import {
   LineElement,
   Title,
 } from "chart.js";
-
+import Footer from ".//Footer"; 
 ChartJS.register(
   ArcElement,
   Tooltip,
@@ -212,6 +212,7 @@ const DashboardView = () => {
         </h4>
         <Line data={machineLineData} />
       </div>
+      <Footer/>
     </div>
   );
 };

@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { Bell, AlertTriangle, CheckCircle, X } from "lucide-react";
-
+import Footer from ".//Footer"
 const NotificationsView = () => {
   const [notifications, setNotifications] = useState([]);
 
@@ -84,6 +84,7 @@ const NotificationsView = () => {
           </div>
         ))}
       </div>
+        <Footer />
     </div>
   );
 };
