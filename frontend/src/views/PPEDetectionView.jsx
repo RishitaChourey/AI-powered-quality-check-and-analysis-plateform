@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from "react";
-import { Camera, Image as ImageIcon, Download } from 'lucide-react'; 
+import { Camera, Image as ImageIcon, Download, Plus } from "lucide-react";
 import axios from "axios";
 import Webcam from "react-webcam";
 
@@ -180,7 +180,24 @@ const PPEDetectionView = () => {
           </div>
         )}
       </div>
+<div className="mt-10 bg-white p-6 rounded-lg shadow-lg w-full max-w-2xl">
+  <h3 className="text-2xl font-bold mb-4 text-center text-blue-600">
+    New Employee / Face Not Registered
+  </h3>
+  <p className="text-gray-600 mb-6 text-center">
+    Register a new employee’s face to enable recognition in the monitoring system.
+  </p>
 
+  <div className="flex justify-center">
+    <button
+      onClick={() => alert("Open Add Face UI")} // replace with navigation or modal
+      className="flex items-center gap-2 px-5 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg shadow-md font-semibold transition-transform transform hover:scale-105"
+    >
+      <Plus size={20} />
+      Add New Face
+    </button>
+  </div>
+</div>
       {Object.keys(summary).length > 0 && (
         <div className="mt-8 bg-white p-6 rounded-lg shadow-lg w-full max-w-2xl">
           <h3 className="text-2xl font-semibold mb-4 text-gray-800">Detections</h3>
