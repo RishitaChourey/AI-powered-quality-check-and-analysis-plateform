@@ -209,6 +209,13 @@ const handleSubmit = async (e) => {
                 {loading ? "Processing..." : "Detect from Capture"}
               </button>
             </div>
+            {loading && (
+    <div className="flex flex-col items-center mt-3">
+      <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-600"></div>
+      <p className="text-center text-sm text-gray-600 mt-2">Processing...</p>
+    </div>
+  )}
+
           </div>
         )}
       </div>
