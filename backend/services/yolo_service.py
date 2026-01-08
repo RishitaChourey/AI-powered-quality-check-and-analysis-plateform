@@ -9,7 +9,7 @@ machine_model = YOLO(os.path.join(WEIGHTS_DIR, "machine_model.pt"))
 
 
 def run_ppe_detection(path: str):
-    return ppe_model.predict(source=path, save=True, conf=0.60, project="static", name="detections", exist_ok=True)
+    return ppe_model.predict(source=path, save=True, conf=0.25,iou=0.55, project="static", name="detections", exist_ok=True)
 
 def run_machine_detection(path: str):
     return machine_model.predict(source=path, save=True, conf=0.50, project="static", name="machine", exist_ok=True)
