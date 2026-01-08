@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-
+import Footer from ".//Footer"; 
 const ForgotPasswordView = () => {
   const navigate = useNavigate();
   const [email, setEmail] = useState('');
@@ -52,6 +52,7 @@ const ForgotPasswordView = () => {
           </button>
         </div>
       </div>
+      <Footer />
     </div>
   );
 };

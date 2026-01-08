@@ -13,7 +13,7 @@ import {
   LineElement,
   Title,
 } from "chart.js";
-
+import Footer from ".//Footer"; 
 ChartJS.register(
   ArcElement,
   Tooltip,
@@ -69,12 +69,22 @@ const DashboardView = () => {
   );
 
   // Split PPE classes into positives vs negatives
+  const NEGATIVE_TOKENS = ["no", "missing", "without", "incorrect"];
+
+  const negativeClasses = classSummary.filter(
+    (c) =>
+      c.class_name &&
+      NEGATIVE_TOKENS.some((token) =>
+        c.class_name.toLowerCase().includes(token)
+      )
+  );
+
   const positiveClasses = classSummary.filter(
-    (c) => !c.class_name.startsWith("no_")
+    (c) => !negativeClasses.includes(c)
   );
-  const negativeClasses = classSummary.filter((c) =>
-    c.class_name.startsWith("no_")
-  );
+
+
+
 
   // Pie chart data (positive PPE)
   const positivePieData = {
@@ -212,6 +222,7 @@ const DashboardView = () => {
         </h4>
         <Line data={machineLineData} />
       </div>
+      <Footer/>
     </div>
   );
 };
