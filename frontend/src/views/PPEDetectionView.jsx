@@ -13,7 +13,6 @@ const PPEDetectionView = () => {
   const [annotatedMedia, setAnnotatedMedia] = useState("");
   const [loading, setLoading] = useState(false);
   const [isVideo, setIsVideo] = useState(false);
-  const [progress, setProgress] = useState(0);
   const [useWebcam, setUseWebcam] = useState(false);
   const webcamRef = useRef(null);
   const [summary, setSummary] = useState({});
@@ -93,59 +92,47 @@ const [addingFace, setAddingFace] = useState(false);
   };
 
   // Upload file and detect PPE
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    if (!file) return alert("Please upload an image or video first!");
+const handleSubmit = async (e) => {
+  e.preventDefault();
+  if (!file) return alert("Please upload an image or video first!");
 
-    const formData = new FormData();
-    formData.append("file", file);
+  const formData = new FormData();
+  formData.append("file", file);
 
-    try {
-      setLoading(true);
-      setProgress(30);
+  try {
+    setLoading(true);
 
-      const res = await axios.post(API_ENDPOINT, formData, {
-        headers: { "Content-Type": "multipart/form-data" },
-        onUploadProgress: (progressEvent) => {
-          const percent = Math.round((progressEvent.loaded * 100) / progressEvent.total);
-          setProgress(percent);
-        },
-      });
+    const res = await axios.post(API_ENDPOINT, formData, {
+      headers: { "Content-Type": "multipart/form-data" },
+    });
 
-      const data = res.data;
-      if (data.detected_frames) {
-        setDetectedFrames(
-          data.detected_frames.map(
-            f => `http://127.0.0.1:8000${f}`
-          )
-        );
-      } else {
-          setDetectedFrames([]);
-      }
-
-      setDetections([]); // no per-box detections for video
-      setSummary(data.violations || {});
-      if (data.is_video && data.uploaded_file) {
-        setOriginalMedia(`http://127.0.0.1:8000${data.uploaded_file}`);
-        setAnnotatedMedia(null);
-      } else {
-          if (data.original_image) {
-            setOriginalMedia(`http://127.0.0.1:8000${data.original_image}`);
-          }
-          if (data.annotated_image) {
-            setAnnotatedMedia(`http://127.0.0.1:8000${data.annotated_image}`);
-          }
-        }
-
-      setProgress(100);
-    } catch (err) {
-      console.error("Prediction error:", err);
-      alert("Something went wrong while detecting PPE.");
-    } finally {
-      setLoading(false);
-      setTimeout(() => setProgress(0), 800);
+    const data = res.data;
+    if (data.detected_frames) {
+      setDetectedFrames(data.detected_frames.map(f => `http://127.0.0.1:8000${f}`));
+    } else {
+      setDetectedFrames([]);
     }
-  };
+
+    setDetections([]);
+    setSummary(data.violations || {});
+    if (data.is_video && data.uploaded_file) {
+      setOriginalMedia(`http://127.0.0.1:8000${data.uploaded_file}`);
+      setAnnotatedMedia(null);
+    } else {
+      if (data.original_image) {
+        setOriginalMedia(`http://127.0.0.1:8000${data.original_image}`);
+      }
+      if (data.annotated_image) {
+        setAnnotatedMedia(`http://127.0.0.1:8000${data.annotated_image}`);
+      }
+    }
+  } catch (err) {
+    console.error("Prediction error:", err);
+    alert("Something went wrong while detecting PPE.");
+  } finally {
+    setLoading(false);
+  }
+};
 
   // Cleanup object URLs
   useEffect(() => {
@@ -190,16 +177,11 @@ const [addingFace, setAddingFace] = useState(false);
             </button>
 
             {loading && (
-              <div className="w-full max-w-sm mt-3">
-                <div className="w-full bg-gray-200 rounded-full h-3 overflow-hidden">
-                  <div
-                    className="bg-blue-600 h-3 rounded-full transition-all duration-300 ease-out"
-                    style={{ width: `${progress}%` }}
-                  ></div>
-                </div>
-                <p className="text-center text-sm text-gray-600 mt-1">Processing... {progress}%</p>
-              </div>
-            )}
+  <div className="flex flex-col items-center mt-3">
+    <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-600"></div>
+    <p className="text-center text-sm text-gray-600 mt-2">Processing...</p>
+  </div>
+)}
           </form>
         ) : (
           <div className="flex flex-col items-center gap-3">

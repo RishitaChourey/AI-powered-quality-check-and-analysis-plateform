@@ -5,7 +5,6 @@ import Footer from ".//Footer";
 const MachineDetectionView = () => {
   const [file, setFile] = useState(null);
   const [loading, setLoading] = useState(false);
-  const [progress, setProgress] = useState(0);
 
   const [originalVideo, setOriginalVideo] = useState("");
   const [annotatedVideo, setAnnotatedVideo] = useState("");
@@ -16,45 +15,34 @@ const MachineDetectionView = () => {
     setFile(selected);
   };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    if (!file) return alert("Please upload a video first!");
+const handleSubmit = async (e) => {
+  e.preventDefault();
+  if (!file) return alert("Please upload a video first!");
 
-    const formData = new FormData();
-    formData.append("file", file);
+  const formData = new FormData();
+  formData.append("file", file);
 
-    try {
-      setLoading(true);
-      setProgress(20);
+  try {
+    setLoading(true);
 
-      const res = await axios.post(
-        "http://localhost:8000/predict_machine/",
-        formData,
-        {
-          headers: { "Content-Type": "multipart/form-data" },
-          onUploadProgress: (event) => {
-            const percent = Math.round((event.loaded * 100) / event.total);
-            setProgress(percent);
-          },
-        }
-      );
+    const res = await axios.post(
+      "http://localhost:8000/predict_machine/",
+      formData,
+      { headers: { "Content-Type": "multipart/form-data" } }
+    );
 
-      setProgress(90);
+    const data = res.data;
+    if (data.original) setOriginalVideo("http://localhost:8000" + data.original);
+    if (data.annotated) setAnnotatedVideo("http://localhost:8000" + data.annotated);
+    if (data.checkpoints) setCheckpoints(data.checkpoints);
 
-      const data = res.data;
-      if (data.original) setOriginalVideo("http://localhost:8000" + data.original);
-      if (data.annotated) setAnnotatedVideo("http://localhost:8000" + data.annotated);
-      if (data.checkpoints) setCheckpoints(data.checkpoints);
-
-      setProgress(100);
-    } catch (err) {
-      console.error(err);
-      alert("Something went wrong while processing the video.");
-    } finally {
-      setLoading(false);
-      setTimeout(() => setProgress(0), 1000);
-    }
-  };
+  } catch (err) {
+    console.error(err);
+    alert("Something went wrong while processing the video.");
+  } finally {
+    setLoading(false);
+  }
+};
 
   return (
     <div className="flex flex-col items-center mt-8 p-4 w-full">
@@ -91,18 +79,11 @@ const MachineDetectionView = () => {
           </button>
 
           {loading && (
-            <div className="w-full max-w-sm mt-3">
-              <div className="w-full bg-gray-200 rounded-full h-3 overflow-hidden">
-                <div
-                  className="bg-blue-600 h-3 rounded-full transition-all duration-300 ease-out"
-                  style={{ width: `${progress}%` }}
-                ></div>
-              </div>
-              <p className="text-center text-sm text-gray-600 mt-1">
-                Processing... {progress}%
-              </p>
-            </div>
-          )}
+  <div className="flex flex-col items-center mt-3">
+    <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-600"></div>
+    <p className="text-center text-sm text-gray-600 mt-2">Processing...</p>
+  </div>
+)}
         </form>
       </div>
 
