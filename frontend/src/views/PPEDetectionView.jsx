@@ -20,6 +20,56 @@ const PPEDetectionView = () => {
   const [processedImageUrl, setProcessedImageUrl] = useState(null);
   const [error, setError] = useState(null);
   const [detectedFrames, setDetectedFrames] = useState([]);
+  const [faceName, setFaceName] = useState("");
+const [faceImage, setFaceImage] = useState(null);
+const [facePreview, setFacePreview] = useState(null);
+const [addingFace, setAddingFace] = useState(false);
+
+  const handleFaceImageChange = (e) => {
+    const img = e.target.files[0];
+    if (!img) return;
+    setFaceImage(img);
+    setFacePreview(URL.createObjectURL(img));
+  };
+
+  const captureFaceFromWebcam = () => {
+    const imageSrc = webcamRef.current.getScreenshot();
+    if (!imageSrc) return alert("Capture failed");
+    fetch(imageSrc)
+      .then(res => res.blob())
+      .then(blob => {
+        const file = new File([blob], "face.jpg", { type: "image/jpeg" });
+        setFaceImage(file);
+        setFacePreview(URL.createObjectURL(file));
+      });
+  };
+
+  const handleAddFace = async () => {
+    if (!faceName || !faceImage) {
+      alert("Please provide both name and face image");
+      return;
+    }
+    const formData = new FormData();
+    formData.append("name", faceName);
+    formData.append("image", faceImage);
+
+    try {
+      setAddingFace(true);
+      await axios.post("http://127.0.0.1:8000/face/add_face/", formData, {
+        headers: { "Content-Type": "multipart/form-data" }
+      });
+      alert("Face added successfully!");
+      // reset
+      setFaceName("");
+      setFaceImage(null);
+      setFacePreview(null);
+    } catch (err) {
+      console.error(err);
+      alert("Failed to add face");
+    } finally {
+      setAddingFace(false);
+    }
+  };
 
   // Handle file input
   const handleFileChange = (e) => {
@@ -181,21 +231,50 @@ const PPEDetectionView = () => {
         )}
       </div>
 <div className="mt-10 bg-white p-6 rounded-lg shadow-lg w-full max-w-2xl">
-  <h3 className="text-2xl font-bold mb-4 text-center text-blue-600">
-    New Employee / Face Not Registered
+  <h3 className="text-2xl font-semibold mb-4 text-gray-800">
+    Add New Face (Face Registration)
   </h3>
-  <p className="text-gray-600 mb-6 text-center">
-    Register a new employee’s face to enable recognition in the monitoring system.
-  </p>
-
-  <div className="flex justify-center">
-    <button
-      onClick={() => alert("Open Add Face UI")} // replace with navigation or modal
-      className="flex items-center gap-2 px-5 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg shadow-md font-semibold transition-transform transform hover:scale-105"
-    >
-      <Plus size={20} />
-      Add New Face
-    </button>
+  <div className="flex flex-col gap-4">
+    <input
+      type="text"
+      placeholder="Enter person's name"
+      value={faceName}
+      onChange={(e) => setFaceName(e.target.value)}
+      className="p-2 border rounded text-gray-700"
+    />
+    <input
+      type="file"
+      accept="image/*"
+      onChange={handleFaceImageChange}
+      className="p-2 border rounded"
+    />
+    <div className="flex gap-3">
+      <button
+        onClick={captureFaceFromWebcam}
+        className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded"
+      >
+        Capture from Webcam
+      </button>
+      <button
+        onClick={handleAddFace}
+        disabled={addingFace}
+        className={`px-4 py-2 rounded text-white ${
+          addingFace ? "bg-blue-400 cursor-not-allowed" : "bg-blue-600 hover:bg-blue-700"
+        }`}
+      >
+        {addingFace ? "Saving..." : "Save Face"}
+      </button>
+    </div>
+    {facePreview && (
+      <div className="mt-4">
+        <p className="text-sm text-gray-600 mb-1">Preview</p>
+        <img
+          src={facePreview}
+          alt="Face Preview"
+          className="w-40 h-40 object-cover rounded-lg border"
+        />
+      </div>
+    )}
   </div>
 </div>
       {Object.keys(summary).length > 0 && (
