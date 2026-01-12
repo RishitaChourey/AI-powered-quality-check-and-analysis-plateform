@@ -14,6 +14,7 @@ import AboutView from './views/AboutView';
 import PPEDetectionView from './views/PPEDetectionView';
 import MachineDetectionView from './views/MachineDetectionView';
 import LandingPage from "./views/LandingPage";
+import VerifyOtp from "./views/VerifyOtp";
 
 // Authentication Views
 import LoginView from './views/LoginView';
@@ -59,6 +60,7 @@ const App = () => {
               <Route path='/signup' element={<SignupView />} />
               <Route path='/forgot-password' element={<ForgotPasswordView />} />
               <Route path='/about' element={<AboutView />} />
+              <Route path="/verify-otp" element={<VerifyOtp />} />
 
               {/* Protected Routes */}
               <Route

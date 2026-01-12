@@ -35,13 +35,22 @@ const LoginView = ({ onLoginSuccess }) => {
 
       const data = await response.json();
 
-      if (response.ok) {
-        // Login successful, call parent handler
-        onLoginSuccess({ email, name: data.name || '' });
-      } else {
-        // Show backend error
-        setError(data.message || 'Invalid credentials');
+    if (response.ok) {
+      // Login successful
+      onLoginSuccess({ email, name: data.name || '' });
+    } else {
+      const errorMsg = data.detail || data.message || "Login failed";
+      setError(errorMsg);
+
+      // If email is not verified, redirect to OTP verification page
+      if (
+        errorMsg.toLowerCase().includes("otp") ||
+        errorMsg.toLowerCase().includes("not verified")
+      ) {
+        navigate("/verify-otp", { state: { email } });
       }
+    }
+
     } catch (err) {
       console.error("Login error:", err);
       setError("Server error. Please try again.");
