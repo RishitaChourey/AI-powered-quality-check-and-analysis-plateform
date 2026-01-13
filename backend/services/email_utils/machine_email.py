@@ -20,7 +20,7 @@ def generate_badges(items, bg, color):
         for item in items
     )
 
-async def send_machine_email(to, subject, detected_items, failed_items):
+async def send_machine_email(to, cc, subject, detected_items, failed_items):
     detected_set = set(detected_items)
     failed_set = set(failed_items.keys())
 
@@ -62,6 +62,7 @@ async def send_machine_email(to, subject, detected_items, failed_items):
     message = MessageSchema(
         subject=subject,
         recipients=to,
+        cc=[cc] if cc else [],   # ✅ dynamic CC
         body=html_content,
         subtype="html"
     )
@@ -70,9 +71,9 @@ async def send_machine_email(to, subject, detected_items, failed_items):
     await fm.send_message(message)
 
 # --- synchronous wrapper for BackgroundTasks ---
-def send_machine_email_sync(to, subject, detected_items, failed_items):
+def send_machine_email_sync(to, cc, subject, detected_items, failed_items):
     asyncio.run(
-        send_machine_email(to, subject, detected_items, failed_items)
+        send_machine_email(to, cc, subject, detected_items, failed_items)
     )
 
     
