@@ -41,14 +41,6 @@ const LoginView = ({ onLoginSuccess }) => {
     } else {
       const errorMsg = data.detail || data.message || "Login failed";
       setError(errorMsg);
-
-      // If email is not verified, redirect to OTP verification page
-      if (
-        errorMsg.toLowerCase().includes("otp") ||
-        errorMsg.toLowerCase().includes("not verified")
-      ) {
-        navigate("/verify-otp", { state: { email } });
-      }
     }
 
     } catch (err) {
