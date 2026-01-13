@@ -36,9 +36,6 @@ const LoginView = ({ onLoginSuccess }) => {
       const data = await response.json();
 
     if (response.ok) {
-      // ✅ Store email in localStorage for later use
-      localStorage.setItem("email", email);
-
       // Login successful
       onLoginSuccess({ email, name: data.name || '' });
     } else {
