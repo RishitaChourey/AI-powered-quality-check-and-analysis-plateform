@@ -1,4 +1,4 @@
-from fastapi import APIRouter, UploadFile, File, BackgroundTasks
+from fastapi import APIRouter, UploadFile, File, BackgroundTasks, Header
 from fastapi.responses import JSONResponse
 import shutil, os, glob
 from collections import Counter
@@ -12,7 +12,8 @@ from db.database import update_class_summary, update_checkpoint_summary, save_ma
 router = APIRouter()
 
 @router.post("/")
-async def predict_machine(file: UploadFile = File(...), background_tasks: BackgroundTasks = None):
+async def predict_machine(file: UploadFile = File(...), background_tasks: BackgroundTasks = None, user_email: str = Header(None)):
+    print("🔥 CC USER EMAIL HEADER:", user_email)
     try:
         # Save uploaded file
         os.makedirs("static/uploads", exist_ok=True)
@@ -70,6 +71,11 @@ async def predict_machine(file: UploadFile = File(...), background_tasks: Backgr
         )
         conn.commit()
         conn.close()
+        
+        if user_email and "@" in user_email:
+            cc_email = user_email
+        else:
+            cc_email = None
 
         # Auto Email if any checkpoint failed
         if background_tasks:
@@ -78,6 +84,7 @@ async def predict_machine(file: UploadFile = File(...), background_tasks: Backgr
                 background_tasks.add_task(
                 send_machine_email_sync,
                 ["industryproject87@gmail.com"],
+                cc_email,
                 "Machine Quality Alert",
                 [d["class"] for d in detections],          # detected_items
                 {cp["name"]: 1 for cp in checkpoints if not cp["passed"]}  # failed_items

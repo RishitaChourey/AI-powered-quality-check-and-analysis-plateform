@@ -16,9 +16,11 @@ const MachineDetectionView = () => {
   };
 
 const handleSubmit = async (e) => {
+
   e.preventDefault();
   if (!file) return alert("Please upload a video first!");
-
+  const loggedInUserEmail = localStorage.getItem("email");
+  console.log("Logged-in user email:", loggedInUserEmail);
   const formData = new FormData();
   formData.append("file", file);
 
@@ -28,7 +30,9 @@ const handleSubmit = async (e) => {
     const res = await axios.post(
       "http://localhost:8000/predict_machine/",
       formData,
-      { headers: { "Content-Type": "multipart/form-data" } }
+      { headers: { "Content-Type": "multipart/form-data",
+         "user-email": loggedInUserEmail   // ✅ ADD THIS LINE
+       } }
     );
 
     const data = res.data;
