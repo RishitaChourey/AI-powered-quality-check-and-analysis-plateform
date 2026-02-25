@@ -36,14 +36,11 @@ const SignupView = () => {
       const data = await response.json();
 
       if (response.ok) {
-        setSuccess(true);
-        setName('');
-        setEmail('');
-        setPassword('');
-
-        // Redirect to login after success
-        setTimeout(() =>  navigate('/'), 1500);
-      } else {
+        navigate('/verify-otp', {
+          state: { email }
+        });
+      }
+      else {
         setError(data.detail || data.message || 'Signup failed.');
       }
     } catch (err) {

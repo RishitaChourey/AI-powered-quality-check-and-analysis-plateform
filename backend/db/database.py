@@ -13,7 +13,10 @@ def init_db():
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             name TEXT,
             email TEXT UNIQUE NOT NULL,
-            password TEXT NOT NULL
+            password TEXT NOT NULL,
+            is_verified INTEGER DEFAULT 0,
+            otp TEXT,
+            otp_expiry DATETIME
         )
     ''')
 
