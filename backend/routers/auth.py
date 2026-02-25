@@ -8,6 +8,7 @@ router = APIRouter()
 
 UPLOADS = "static/uploads"
 FRAMES = "static/detections"
+MACHINE = "static/machine"
 
 @router.post("/signup")
 async def signup(user: User):
@@ -32,6 +33,7 @@ async def login(user: User):
     if row:
         clear_folder(UPLOADS)
         clear_folder(FRAMES)
+        clear_folder(MACHINE)
 
         return JSONResponse({"message": "Login successful!"}, status_code=200)
     return JSONResponse({"message": "Invalid email or password."}, status_code=401)

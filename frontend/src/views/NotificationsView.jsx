@@ -39,9 +39,9 @@ const NotificationsView = () => {
               className={`p-4 rounded-xl shadow-md border transition-all w-full
                 ${
                   note.type === "ppe"
-                    ? note.failed_items && note.failed_items.length > 0
-                      ? "bg-purple-100 border-purple-300"
-                      : "bg-purple-50 border-purple-200"
+                    ? note.title.includes("Safe")
+                      ? "bg-green-100 border-green-300"
+                      : "bg-purple-100 border-purple-300"
                     : note.type === "machine"
                     ? note.failed_items && note.failed_items.length > 0
                       ? "bg-yellow-100 border-yellow-300"
