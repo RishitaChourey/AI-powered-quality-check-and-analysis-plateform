@@ -14,7 +14,6 @@ const Header = ({ currentPage, checkType, isAuthenticated, onLogout }) => {
     Notifications: '/notifications',
     PPE: '/home/ppe',
     Machine: '/home/machine',
-    About: '/about',
     Login: '/login',
     Signup: '/signup',
     ForgotPassword: '/forgot-password',
@@ -32,7 +31,7 @@ const Header = ({ currentPage, checkType, isAuthenticated, onLogout }) => {
     } else if (action === 'Logout') {
       onLogout();
     } else if (action === 'About') {
-      navigate('/about');
+      navigate('/');
     }
   };
 
@@ -92,7 +91,7 @@ const Header = ({ currentPage, checkType, isAuthenticated, onLogout }) => {
                 
                 {/* Always show About link in main nav */}
                 <button
-                    onClick={() => navigate(routeMap.About)}
+                    onClick={() => navigate('/')}
                     className={`
                         h-full flex items-center px-2 border-b-2 font-medium transition duration-150 ease-in-out
                         ${currentPage === 'About' 

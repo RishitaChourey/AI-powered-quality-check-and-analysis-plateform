@@ -10,7 +10,6 @@ import TitleBanner from './components/TitleBanner';
 import HomeView from './views/HomeView';
 import DashboardView from './views/DashboardView';
 import NotificationsView from './views/NotificationsView';
-import AboutView from './views/AboutView';
 import PPEDetectionView from './views/PPEDetectionView';
 import MachineDetectionView from './views/MachineDetectionView';
 import LandingPage from "./views/LandingPage";
@@ -58,7 +57,6 @@ const App = () => {
               />
               <Route path='/signup' element={<SignupView />} />
               <Route path='/forgot-password' element={<ForgotPasswordView />} />
-              <Route path='/about' element={<AboutView />} />
 
               {/* Protected Routes */}
               <Route
