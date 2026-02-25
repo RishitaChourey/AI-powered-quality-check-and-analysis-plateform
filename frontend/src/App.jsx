@@ -1,5 +1,5 @@
 // src/App.jsx
-import React, { useState } from 'react';
+import React, { useState, useEffect  } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 
 // Components
@@ -22,17 +22,34 @@ import ForgotPasswordView from './views/ForgotPasswordView';
 const App = () => {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [user, setUser] = useState(null);
-
+  const [loading, setLoading] = useState(true);
   const handleLoginSuccess = (userData) => {
     setUser(userData);
     setIsLoggedIn(true);
+
+    localStorage.setItem("isLoggedIn", "true");
+    localStorage.setItem("user", JSON.stringify(userData));
   };
 
   const handleLogout = () => {
     setUser(null);
     setIsLoggedIn(false);
-  };
 
+    localStorage.removeItem("isLoggedIn");
+    localStorage.removeItem("user");
+  };
+  useEffect(() => {
+    const storedLogin = localStorage.getItem("isLoggedIn");
+    const storedUser = localStorage.getItem("user");
+
+    if (storedLogin === "true" && storedUser) {
+      setIsLoggedIn(true);
+      setUser(JSON.parse(storedUser));
+    }
+
+    setLoading(false);
+  }, []);
+  if (loading) return null; 
   return (
     <Router>
       <div className='min-h-screen bg-gray-50 font-sans'>
