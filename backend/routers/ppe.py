@@ -2,6 +2,7 @@ from fastapi import APIRouter, UploadFile, File, BackgroundTasks
 from fastapi.responses import JSONResponse
 import shutil, os, re, json
 from collections import Counter
+from services.file_utils import clear_folder
 
 # New detection services
 from services.detection_service import (
@@ -33,6 +34,10 @@ async def predict(
     background_tasks: BackgroundTasks = None
 ):
     try:
+        # Clean uploads and frames before new detection
+        clear_folder("static/uploads")
+        clear_folder("static/detections")
+
         # ---------------- SAVE FILE ---------------- #
         safe_filename = re.sub(r'[^a-zA-Z0-9_.-]', '_', file.filename)
         os.makedirs("static/uploads", exist_ok=True)
@@ -83,6 +88,8 @@ async def predict(
         ]
         if unknown_negative:
             violations["Unknown"] = list(set(unknown_negative))
+        if not violations:
+            violations["Safe"] = ["No PPE violations detected"]
 
         # ---------------- EMAIL (ASYNC) ---------------- #
         if violations and background_tasks:
