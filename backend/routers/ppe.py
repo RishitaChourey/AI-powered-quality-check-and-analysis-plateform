@@ -2,6 +2,7 @@ from fastapi import APIRouter, UploadFile, File, BackgroundTasks
 from fastapi.responses import JSONResponse
 import shutil, os, re, json
 from collections import Counter
+from services.file_utils import clear_folder
 
 # New detection services
 from services.detection_service import (
@@ -33,6 +34,10 @@ async def predict(
     background_tasks: BackgroundTasks = None
 ):
     try:
+        # Clean uploads and frames before new detection
+        clear_folder("static/uploads")
+        clear_folder("static/detections")
+        is_safe_run = False
         # ---------------- SAVE FILE ---------------- #
         safe_filename = re.sub(r'[^a-zA-Z0-9_.-]', '_', file.filename)
         os.makedirs("static/uploads", exist_ok=True)
@@ -83,9 +88,13 @@ async def predict(
         ]
         if unknown_negative:
             violations["Unknown"] = list(set(unknown_negative))
+        
+        if not violations:
+            violations = {"Safe": ["No PPE violations detected"]}
+            is_safe_run = True
 
         # ---------------- EMAIL (ASYNC) ---------------- #
-        if violations and background_tasks:
+        if not is_safe_run and background_tasks:
             background_tasks.add_task(
                 send_ppe_email,
                 to=["industryproject87@gmail.com"],
@@ -112,12 +121,19 @@ async def predict(
         update_class_summary(summary)
         conn = get_connection()
         c = conn.cursor()
+        if is_safe_run:
+            title = "All seems good!"
+            message = "No PPE violations detected in the last run."
+        else:
+            title = "🚨 PPE Violation Detected"
+            message = "Violations detected. Please take immediate action."
+
         c.execute(
             "INSERT INTO notifications (type, title, message, summary) VALUES (?, ?, ?, ?)",
             (
                 "ppe",
-                "PPE Detection Completed",
-                "Please take immediate action to ensure workplace safety and compliance.",
+                title,
+                message,
                 json.dumps(summary)
             )
         )

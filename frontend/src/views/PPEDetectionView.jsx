@@ -108,7 +108,12 @@ const handleSubmit = async (e) => {
 
     const data = res.data;
     if (data.detected_frames) {
-      setDetectedFrames(data.detected_frames.map(f => `http://127.0.0.1:8000${f}`));
+      const timestamp = Date.now();
+      setDetectedFrames(
+        data.detected_frames.map(
+          f => `http://127.0.0.1:8000${f}?t=${timestamp}`
+        )
+      );
     } else {
       setDetectedFrames([]);
     }
@@ -275,21 +280,40 @@ const handleSubmit = async (e) => {
   PPE Violations Summary
 </h4>
 
-<div className="space-y-3">
-  {Object.entries(summary).map(([person, violations]) => (
-    <div
-      key={person}
-      className="border rounded-lg p-3 bg-red-50"
-    >
-      <p className="font-semibold text-gray-800">{person}</p>
-      <ul className="list-disc list-inside text-red-600">
-        {violations.map((v, idx) => (
-          <li key={idx}>{v}</li>
-        ))}
-      </ul>
-    </div>
-  ))}
-</div>
+              <div className="space-y-3">
+                {Object.entries(summary).map(([person, violations]) => {
+                  const isSafe =
+                    person === "Safe";
+                  return (
+                    <div
+                      key={person}
+                      className={`border rounded-lg p-3 ${
+                        isSafe
+                          ? "bg-green-50 border-green-300"
+                          : "bg-red-50 border-red-300"
+                      }`}
+                    >
+                      <p
+                        className={`font-semibold ${
+                          isSafe ? "text-green-800" : "text-gray-800"
+                        }`}
+                      >
+                        {person}
+                      </p>
+
+                      <ul
+                        className={`list-disc list-inside ${
+                          isSafe ? "text-green-600" : "text-red-600"
+                        }`}
+                      >
+                        {violations.map((v, idx) => (
+                          <li key={idx}>{v}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  );
+                })}
+              </div>
 
             </div>
           )}

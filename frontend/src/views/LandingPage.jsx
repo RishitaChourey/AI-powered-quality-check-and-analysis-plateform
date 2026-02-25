@@ -3,12 +3,26 @@ import React from "react";
 import { Carousel } from "react-responsive-carousel";
 import "react-responsive-carousel/lib/styles/carousel.min.css";
 import Footer from ".//Footer";
+import { useNavigate } from 'react-router-dom';
 
 const LandingPage = () => {
+  const navigate = useNavigate();
   return (
     <div className="max-w-7xl mx-auto px-6 py-12 bg-gray-50">
+       <div className="text-center py-8 border-y border-gray-200">
+          <h3 className="text-2xl font-bold text-indigo-700 mb-3">Get Started</h3>
+          <p className="text-gray-600 mb-4">
+            If you are not yet logged in, access the platform to start using our AI services.
+          </p>
+          <button
+            onClick={() => navigate('/login')}
+            className="bg-indigo-600 text-white font-bold py-3 px-8 rounded-lg shadow-lg hover:bg-indigo-700 transition duration-300 transform hover:scale-105"
+          >
+            Go to Login
+          </button>
+        </div>
       {/* Hero Section */}
-      <section className="text-center mb-16">
+      <section className="text-center mb-16 mt-7">
         <h1 className="text-4xl font-bold text-blue-600 mb-4">
           AI-Powered Safety Monitoring
         </h1>
@@ -41,7 +55,7 @@ const LandingPage = () => {
           culture.
         </p>
       </section>
-
+      
       {/* AI-Powered Safety Checks */}
       <section className="mb-16">
         <h2 className="text-2xl font-semibold text-teal-600 mb-4">

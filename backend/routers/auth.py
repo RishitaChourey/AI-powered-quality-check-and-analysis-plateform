@@ -2,8 +2,13 @@ from fastapi import APIRouter
 from fastapi.responses import JSONResponse
 from models.users import User
 from db.database import get_connection
+from services.file_utils import clear_folder
 
 router = APIRouter()
+
+UPLOADS = "static/uploads"
+FRAMES = "static/detections"
+MACHINE = "static/machine"
 
 @router.post("/signup")
 async def signup(user: User):
@@ -26,5 +31,9 @@ async def login(user: User):
     row = c.fetchone()
     conn.close()
     if row:
+        clear_folder(UPLOADS)
+        clear_folder(FRAMES)
+        clear_folder(MACHINE)
+
         return JSONResponse({"message": "Login successful!"}, status_code=200)
     return JSONResponse({"message": "Invalid email or password."}, status_code=401)
