@@ -29,6 +29,7 @@ Make sure you have a requirements.txt file in the backend folder.
 ```bash
 pip install -r requirements.txt
 ```
+Place the .env file in backend folder
 
 ▶️ Phase 3: Run the Application
 
