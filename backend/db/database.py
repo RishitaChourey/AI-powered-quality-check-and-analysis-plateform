@@ -6,6 +6,8 @@ def init_db():
     """Initialize the database with all required tables."""
     conn = sqlite3.connect(DB_FILE)
     c = conn.cursor()
+    #     # ⚠️ DROP old users table
+    # c.execute("DROP TABLE IF EXISTS users")
 
     # Users table
     c.execute('''
