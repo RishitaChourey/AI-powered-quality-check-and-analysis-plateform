@@ -14,7 +14,8 @@ const PPEDetectionView = () => {
   const [loading, setLoading] = useState(false);
   const [isVideo, setIsVideo] = useState(false);
   const [useWebcam, setUseWebcam] = useState(false);
-  const webcamRef = useRef(null);
+  const ppeWebcamRef = useRef(null);   // PPE detection webcam
+  const faceWebcamRef = useRef(null);  // Face registration webcam
   const [summary, setSummary] = useState({});
   const [processedImageUrl, setProcessedImageUrl] = useState(null);
   const [error, setError] = useState(null);
@@ -32,7 +33,7 @@ const [addingFace, setAddingFace] = useState(false);
   };
 
   const captureFaceFromWebcam = () => {
-    const imageSrc = webcamRef.current.getScreenshot();
+    const imageSrc = faceWebcamRef.current.getScreenshot();
     if (!imageSrc) return alert("Capture failed");
     fetch(imageSrc)
       .then(res => res.blob())
@@ -79,7 +80,7 @@ const [addingFace, setAddingFace] = useState(false);
 
   // Capture image from webcam
   const captureFromWebcam = () => {
-    const imageSrc = webcamRef.current.getScreenshot();
+    const imageSrc = ppeWebcamRef.current.getScreenshot();
     if (!imageSrc) return alert("Unable to capture from webcam.");
 
     fetch(imageSrc)
@@ -192,7 +193,7 @@ const handleSubmit = async (e) => {
           <div className="flex flex-col items-center gap-3">
             <Webcam
               audio={false}
-              ref={webcamRef}
+              ref={ppeWebcamRef}
               screenshotFormat="image/jpeg"
               className="rounded-lg shadow-md w-full max-w-sm"
               videoConstraints={{ width: 640, height: 480, facingMode: "user" }}
@@ -235,6 +236,13 @@ const handleSubmit = async (e) => {
       value={faceName}
       onChange={(e) => setFaceName(e.target.value)}
       className="p-2 border rounded text-gray-700"
+    />
+    <Webcam
+      audio={false}
+      ref={faceWebcamRef}
+      screenshotFormat="image/jpeg"
+      className="rounded-lg shadow-md w-full max-w-sm"
+      videoConstraints={{ width: 640, height: 480, facingMode: "user" }}
     />
     <input
       type="file"
