@@ -6,6 +6,8 @@ def init_db():
     """Initialize the database with all required tables."""
     conn = sqlite3.connect(DB_FILE)
     c = conn.cursor()
+    #     # ⚠️ DROP old users table
+    # c.execute("DROP TABLE IF EXISTS users")
 
     # Users table
     c.execute('''
@@ -13,7 +15,10 @@ def init_db():
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             name TEXT,
             email TEXT UNIQUE NOT NULL,
-            password TEXT NOT NULL
+            password TEXT NOT NULL,
+            is_verified INTEGER DEFAULT 0,
+            otp TEXT,
+            otp_expiry DATETIME
         )
     ''')
 
