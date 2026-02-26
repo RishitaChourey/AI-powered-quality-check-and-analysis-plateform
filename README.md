@@ -29,6 +29,7 @@ Make sure you have a requirements.txt file in the backend folder.
 ```bash
 pip install -r requirements.txt
 ```
+Place the .env file in backend folder
 
 ▶️ Phase 3: Run the Application
 
@@ -50,23 +51,8 @@ uvicorn app:app --reload
 http://127.0.0.1:8000
 
 ```
-2️⃣ Run the Login Backend (Terminal 2)
 
-Open a new terminal window, activate your virtual environment again (if not already), and then navigate to the login backend folder if applicable.
-
-Run the following command:
-```bash
-python login.py
-```
-
-✅ The login backend will start running locally.
-You can log in using these credentials:
-```bash
-Email: a@gmail.com  
-Password: 123456
-```
-
-💻 2️⃣ Run the Frontend (Terminal 3)
+💻 2️⃣ Run the Frontend (Terminal 2)
 Open a new terminal and navigate to the frontend folder:
 
 ```bash
