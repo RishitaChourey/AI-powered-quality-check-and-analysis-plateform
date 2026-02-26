@@ -5,13 +5,33 @@ import mysql.connector
 # Load environment variables from .env
 load_dotenv()
 
-def get_connection():
-    return mysql.connector.connect(
-        host=os.getenv("DB_HOST"),
-        user=os.getenv("DB_USER"),
-        password=os.getenv("DB_PASSWORD"),
-        database=os.getenv("DB_NAME"),
+DB_HOST = os.getenv("DB_HOST")
+DB_USER = os.getenv("DB_USER")
+DB_PASSWORD = os.getenv("DB_PASSWORD")
+DB_NAME = os.getenv("DB_NAME")
+
+def ensure_database():
+    """Create the database if it doesn't exist."""
+    conn = mysql.connector.connect(
+        host=DB_HOST,
+        user=DB_USER,
+        password=DB_PASSWORD
     )
+    c = conn.cursor()
+    c.execute(f"CREATE DATABASE IF NOT EXISTS {DB_NAME}")
+    conn.commit()
+    conn.close()
+
+def get_connection():
+    """Connect to the database (after ensuring it exists)."""
+    ensure_database()
+    return mysql.connector.connect(
+        host=DB_HOST,
+        user=DB_USER,
+        password=DB_PASSWORD,
+        database=DB_NAME,
+    )
+
 
 def init_db():
     """Initialize the database with all required tables."""
