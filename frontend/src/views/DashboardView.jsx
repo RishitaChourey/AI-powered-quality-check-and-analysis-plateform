@@ -122,13 +122,11 @@ const DashboardView = () => {
 
   // Bar chart data (machine checkpoint failures)
 // Find the highest failed_count
+// thresholds
 const maxCount = Math.max(...checkpointSummary.map(cp => cp.failed_count));
-
-// Divide into thirds
 const lowThreshold = Math.ceil(maxCount / 3);
 const midThreshold = Math.ceil((2 * maxCount) / 3);
 
-// Assign colors based on thresholds
 const colors = checkpointSummary.map(cp => {
   const val = cp.failed_count;
   if (val <= lowThreshold) {
@@ -144,12 +142,33 @@ const checkpointBarData = {
   labels: checkpointSummary.map((cp) => cp.checkpoint_name),
   datasets: [
     {
-      label: "Failed Count",
       data: checkpointSummary.map((cp) => cp.failed_count),
-      backgroundColor: colors, // ✅ dynamic colors
+      backgroundColor: colors,
     },
   ],
 };
+
+const checkpointBarOptions = {
+  plugins: {
+    legend: {
+      title: {
+    display: true,
+    text: "Violation Severity",
+  },
+
+      display: true,
+      onClick: () => {}, // disable toggling
+      labels: {
+        generateLabels: () => [
+          { text: "Low Violations (Blue)", fillStyle: "rgba(59, 130, 246, 0.7)" },
+          { text: "Medium Violations (Purple)", fillStyle: "rgba(139, 92, 246, 0.7)" },
+          { text: "High Violations (Orange)", fillStyle: "rgba(249, 115, 22, 0.7)" },
+        ],
+      },
+    },
+  },
+};
+
   // Line chart data (machine compliance trend)
   const machineLineData = {
     labels: machineSummary.map((m) => m.created_at),
@@ -226,12 +245,12 @@ const checkpointBarData = {
       </div>
 
       {/* Machine Checkpoint Failures Bar Chart */}
-      <div className="bg-white p-6 rounded-xl shadow-lg border border-gray-100 mb-8">
-        <h4 className="text-lg font-semibold mb-4 text-gray-700">
-          Machine Checkpoint Failures
-        </h4>
-        <Bar data={checkpointBarData} />
-      </div>
+<div className="bg-white p-6 rounded-xl shadow-lg border border-gray-100 mb-8">
+  <h4 className="text-lg font-semibold mb-4 text-gray-700">
+    Machine Checkpoint Failures
+  </h4>
+  <Bar data={checkpointBarData} options={checkpointBarOptions} />
+</div>
 
       {/* Machine Compliance Trend Line Chart */}
       <div className="bg-white p-6 rounded-xl shadow-lg border border-gray-100">
