@@ -1,23 +1,32 @@
-import sqlite3, os
-BASE_DIR = os.path.dirname(os.path.dirname(__file__))  # backend/
-DB_FILE = os.path.join(BASE_DIR, "users.db")
+import os
+from dotenv import load_dotenv
+import mysql.connector
+
+# Load environment variables from .env
+load_dotenv()
+
+def get_connection():
+    return mysql.connector.connect(
+        host=os.getenv("DB_HOST"),
+        user=os.getenv("DB_USER"),
+        password=os.getenv("DB_PASSWORD"),
+        database=os.getenv("DB_NAME"),
+    )
 
 def init_db():
     """Initialize the database with all required tables."""
-    conn = sqlite3.connect(DB_FILE)
+    conn = get_connection()
     c = conn.cursor()
-    #     # ⚠️ DROP old users table
-    # c.execute("DROP TABLE IF EXISTS users")
 
     # Users table
     c.execute('''
         CREATE TABLE IF NOT EXISTS users (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            name TEXT,
-            email TEXT UNIQUE NOT NULL,
-            password TEXT NOT NULL,
-            is_verified INTEGER DEFAULT 0,
-            otp TEXT,
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            name VARCHAR(255),
+            email VARCHAR(255) UNIQUE NOT NULL,
+            password VARCHAR(255) NOT NULL,
+            is_verified TINYINT(1) DEFAULT 0,
+            otp VARCHAR(255),
             otp_expiry DATETIME
         )
     ''')
@@ -25,9 +34,9 @@ def init_db():
     # Detection summary table
     c.execute('''
         CREATE TABLE IF NOT EXISTS detection_summary (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            filename TEXT,
-            summary TEXT,  -- store JSON string here
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            filename VARCHAR(255),
+            summary JSON,
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP
         )
     ''')
@@ -35,60 +44,62 @@ def init_db():
     # Class summary table
     c.execute('''
         CREATE TABLE IF NOT EXISTS class_summary (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            class_name TEXT UNIQUE NOT NULL,
-            count INTEGER DEFAULT 0
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            class_name VARCHAR(255) UNIQUE NOT NULL,
+            count INT DEFAULT 0
         )
     ''')
 
-     # Checkpoint summary table (cumulative pass/fail counts per checkpoint)
+    # Checkpoint summary table
     c.execute('''
         CREATE TABLE IF NOT EXISTS checkpoint_summary (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            checkpoint_name TEXT UNIQUE NOT NULL,
-            passed_count INTEGER DEFAULT 0,
-            failed_count INTEGER DEFAULT 0
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            checkpoint_name VARCHAR(255) UNIQUE NOT NULL,
+            passed_count INT DEFAULT 0,
+            failed_count INT DEFAULT 0
         )
     ''')
 
-    # Machine summary table (per-run stats per machine type)
+    # Machine summary table
     c.execute('''
         CREATE TABLE IF NOT EXISTS machine_summary (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            machine_type TEXT DEFAULT 'Machine Type A',
-            filename TEXT,
-            passed_checkpoints INTEGER DEFAULT 0,
-            failed_checkpoints INTEGER DEFAULT 0,
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            machine_type VARCHAR(255) DEFAULT 'Machine Type A',
+            filename VARCHAR(255),
+            passed_checkpoints INT DEFAULT 0,
+            failed_checkpoints INT DEFAULT 0,
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP
         )
     ''')
+
     # Notifications table
     c.execute('''
         CREATE TABLE IF NOT EXISTS notifications (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            type TEXT NOT NULL,              -- "ppe" or "machine"
-            title TEXT,
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            type VARCHAR(50) NOT NULL,       -- "ppe" or "machine"
+            title VARCHAR(255),
             message TEXT,
-            summary TEXT,                    -- JSON string for PPE or machine summary
-            failed_items TEXT,               -- JSON string for machine failed checkpoints
+            summary JSON,                    -- JSON string for PPE or machine summary
+            failed_items JSON,               -- JSON string for machine failed checkpoints
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-            read INTEGER DEFAULT 0           -- 0 = unread, 1 = read
+            is_read TINYINT(1) DEFAULT 0        -- 0 = unread, 1 = read
         )
     ''')
 
     conn.commit()
     conn.close()
 
+
 def update_class_summary(summary_dict):
     """Update or insert class counts into class_summary table."""
-    conn = sqlite3.connect(DB_FILE)
+    conn = get_connection()
     c = conn.cursor()
 
     for class_name, count in summary_dict.items():
-        c.execute("UPDATE class_summary SET count = count + ? WHERE class_name = ?", 
+        c.execute("UPDATE class_summary SET count = count + %s WHERE class_name = %s",
                   (count, class_name))
         if c.rowcount == 0:
-            c.execute("INSERT INTO class_summary (class_name, count) VALUES (?, ?)", 
+            c.execute("INSERT INTO class_summary (class_name, count) VALUES (%s, %s)",
                       (class_name, count))
 
     conn.commit()
@@ -100,18 +111,18 @@ def update_checkpoint_summary(checkpoints: list):
     Update checkpoint_summary with pass/fail counts.
     checkpoints = [{"name": "sensor", "passed": True}, {"name": "valve", "passed": False}]
     """
-    conn = sqlite3.connect(DB_FILE)
+    conn = get_connection()
     c = conn.cursor()
 
     for cp in checkpoints:
         if cp["passed"]:
-            c.execute("UPDATE checkpoint_summary SET passed_count = passed_count + 1 WHERE checkpoint_name = ?", (cp["name"],))
+            c.execute("UPDATE checkpoint_summary SET passed_count = passed_count + 1 WHERE checkpoint_name = %s", (cp["name"],))
             if c.rowcount == 0:
-                c.execute("INSERT INTO checkpoint_summary (checkpoint_name, passed_count, failed_count) VALUES (?, ?, ?)", (cp["name"], 1, 0))
+                c.execute("INSERT INTO checkpoint_summary (checkpoint_name, passed_count, failed_count) VALUES (%s, %s, %s)", (cp["name"], 1, 0))
         else:
-            c.execute("UPDATE checkpoint_summary SET failed_count = failed_count + 1 WHERE checkpoint_name = ?", (cp["name"],))
+            c.execute("UPDATE checkpoint_summary SET failed_count = failed_count + 1 WHERE checkpoint_name = %s", (cp["name"],))
             if c.rowcount == 0:
-                c.execute("INSERT INTO checkpoint_summary (checkpoint_name, passed_count, failed_count) VALUES (?, ?, ?)", (cp["name"], 0, 1))
+                c.execute("INSERT INTO checkpoint_summary (checkpoint_name, passed_count, failed_count) VALUES (%s, %s, %s)", (cp["name"], 0, 1))
 
     conn.commit()
     conn.close()
@@ -122,21 +133,19 @@ def save_machine_summary(machine_type: str, filename: str, checkpoints: list):
     passed = sum(1 for cp in checkpoints if cp["passed"])
     failed = sum(1 for cp in checkpoints if not cp["passed"])
 
-    conn = sqlite3.connect(DB_FILE)
+    conn = get_connection()
     c = conn.cursor()
     c.execute(
-        "INSERT INTO machine_summary (machine_type, filename, passed_checkpoints, failed_checkpoints) VALUES (?, ?, ?, ?)",
+        "INSERT INTO machine_summary (machine_type, filename, passed_checkpoints, failed_checkpoints) VALUES (%s, %s, %s, %s)",
         (machine_type, filename, passed, failed)
     )
     conn.commit()
     conn.close()
 
+
 def clear_class_summary():
-    conn = sqlite3.connect(DB_FILE)
+    conn = get_connection()
     c = conn.cursor()
     c.execute("DELETE FROM class_summary")
     conn.commit()
     conn.close()
-
-def get_connection():
-    return sqlite3.connect(DB_FILE, check_same_thread=False, timeout=10)

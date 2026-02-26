@@ -1,25 +1,27 @@
-from fastapi import APIRouter,HTTPException
+from fastapi import APIRouter, HTTPException
 from fastapi.responses import JSONResponse
 from models.users import User
 from db.database import get_connection
 from services.file_utils import clear_folder
 
-import random,os
-import smtplib
+import random, os, smtplib
 from datetime import datetime, timedelta
 from email.message import EmailMessage
+
 router = APIRouter()
 
 UPLOADS = "static/uploads"
 FRAMES = "static/detections"
 MACHINE = "static/machine"
 
+
 @router.post("/signup")
 async def signup(user: User):
     conn = get_connection()
     c = conn.cursor()
 
-    c.execute("SELECT is_verified FROM users WHERE email=?", (user.email,))
+    # ✅ MySQL placeholder
+    c.execute("SELECT is_verified FROM users WHERE email=%s", (user.email,))
     row = c.fetchone()
 
     otp = str(random.randint(100000, 999999))
@@ -32,11 +34,10 @@ async def signup(user: User):
             raise HTTPException(status_code=400, detail="Email already registered")
         else:
             # User exists but not verified → resend OTP
-            c.execute("""
-                UPDATE users
-                SET otp=?, otp_expiry=?
-                WHERE email=?
-            """, (otp, expiry, user.email))
+            c.execute(
+                "UPDATE users SET otp=%s, otp_expiry=%s WHERE email=%s",
+                (otp, expiry, user.email)
+            )
             conn.commit()
             conn.close()
 
@@ -44,10 +45,10 @@ async def signup(user: User):
             return {"message": "OTP resent. Please verify your email."}
 
     # New user
-    c.execute("""
-        INSERT INTO users (name, email, password, otp, otp_expiry)
-        VALUES (?, ?, ?, ?, ?)
-    """, (user.name, user.email, user.password, otp, expiry))
+    c.execute(
+        "INSERT INTO users (name, email, password, otp, otp_expiry) VALUES (%s, %s, %s, %s, %s)",
+        (user.name, user.email, user.password, otp, expiry)
+    )
 
     conn.commit()
     conn.close()
@@ -55,16 +56,14 @@ async def signup(user: User):
     send_otp_email(user.email, otp)
     return {"message": "OTP sent. Please verify your email."}
 
+
 @router.post("/verify-otp")
 def verify_otp(email: str, otp: str):
     conn = get_connection()
     c = conn.cursor()
 
-    # 1️⃣ Fetch stored OTP
-    c.execute(
-        "SELECT otp FROM users WHERE email = ?",
-        (email,)
-    )
+    # ✅ MySQL placeholder
+    c.execute("SELECT otp FROM users WHERE email=%s", (email,))
     row = c.fetchone()
 
     if not row:
@@ -73,19 +72,14 @@ def verify_otp(email: str, otp: str):
 
     stored_otp = row[0]
 
-    # 2️⃣ Compare OTP
+    # Compare OTP
     if stored_otp != otp:
         conn.close()
         raise HTTPException(status_code=400, detail="Invalid OTP")
 
-    # 3️⃣ Mark user as verified & clear OTP
+    # Mark user as verified & clear OTP
     c.execute(
-        """
-        UPDATE users
-        SET is_verified = 1,
-            otp = NULL
-        WHERE email = ?
-        """,
+        "UPDATE users SET is_verified=1, otp=NULL WHERE email=%s",
         (email,)
     )
 
@@ -94,15 +88,16 @@ def verify_otp(email: str, otp: str):
 
     return {"message": "Email verified successfully"}
 
+
 @router.post("/login")
 async def login(user: User):
     conn = get_connection()
     c = conn.cursor()
 
-    c.execute("""
-        SELECT is_verified FROM users
-        WHERE email=? AND password=?
-    """, (user.email, user.password))
+    c.execute(
+        "SELECT is_verified FROM users WHERE email=%s AND password=%s",
+        (user.email, user.password)
+    )
 
     row = c.fetchone()
     conn.close()
@@ -116,9 +111,10 @@ async def login(user: User):
 
         conn = get_connection()
         c = conn.cursor()
-        c.execute("""
-            UPDATE users SET otp=?, otp_expiry=? WHERE email=?
-        """, (otp, expiry, user.email))
+        c.execute(
+            "UPDATE users SET otp=%s, otp_expiry=%s WHERE email=%s",
+            (otp, expiry, user.email)
+        )
         conn.commit()
         conn.close()
 
@@ -135,8 +131,9 @@ async def login(user: User):
 
     return {"message": "Login successful"}
 
+
 def send_otp_email(to_email: str, otp: str):
-    sender_email  = "factorysafety00@gmail.com"
+    sender_email = "factorysafety00@gmail.com"
     app_password = os.getenv("EMAIL_PASS")
 
     msg = EmailMessage()
@@ -158,7 +155,7 @@ def send_otp_email(to_email: str, otp: str):
         Regards,
         AI Quality Assurance Team
         """
-            )
+    )
 
     with smtplib.SMTP("smtp.gmail.com", 587) as server:
         server.starttls()

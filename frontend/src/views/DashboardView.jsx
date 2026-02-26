@@ -121,17 +121,35 @@ const DashboardView = () => {
   };
 
   // Bar chart data (machine checkpoint failures)
-  const checkpointBarData = {
-    labels: checkpointSummary.map((cp) => cp.checkpoint_name),
-    datasets: [
-      {
-        label: "Failed Count",
-        data: checkpointSummary.map((cp) => cp.failed_count),
-        backgroundColor: "rgba(239, 68, 68, 0.7)", // red bars
-      },
-    ],
-  };
+// Find the highest failed_count
+const maxCount = Math.max(...checkpointSummary.map(cp => cp.failed_count));
 
+// Divide into thirds
+const lowThreshold = Math.ceil(maxCount / 3);
+const midThreshold = Math.ceil((2 * maxCount) / 3);
+
+// Assign colors based on thresholds
+const colors = checkpointSummary.map(cp => {
+  const val = cp.failed_count;
+  if (val <= lowThreshold) {
+    return "rgba(59, 130, 246, 0.7)"; // blue
+  } else if (val <= midThreshold) {
+    return "rgba(139, 92, 246, 0.7)"; // purple
+  } else {
+    return "rgba(249, 115, 22, 0.7)"; // orange
+  }
+});
+
+const checkpointBarData = {
+  labels: checkpointSummary.map((cp) => cp.checkpoint_name),
+  datasets: [
+    {
+      label: "Failed Count",
+      data: checkpointSummary.map((cp) => cp.failed_count),
+      backgroundColor: colors, // ✅ dynamic colors
+    },
+  ],
+};
   // Line chart data (machine compliance trend)
   const machineLineData = {
     labels: machineSummary.map((m) => m.created_at),

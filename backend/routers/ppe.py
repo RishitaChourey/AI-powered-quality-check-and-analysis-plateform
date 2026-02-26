@@ -144,8 +144,8 @@ async def predict(
             title = "🚨 PPE Violation Detected"
             message = "Violations detected. Please take immediate action."
 
-        c.execute(
-            "INSERT INTO notifications (type, title, message, summary) VALUES (?, ?, ?, ?)",
+            c.execute(
+            "INSERT INTO notifications (type, title, message, summary) VALUES (%s, %s, %s, %s)",
             (
                 "ppe",
                 title,
