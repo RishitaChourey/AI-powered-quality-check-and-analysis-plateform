@@ -131,15 +131,17 @@ const handleSubmit = async (e) => {
 
     setDetections([]);
     setSummary(data.violations || {});
+    const base = "http://127.0.0.1:8000";
+    const t = Date.now();
     if (data.is_video && data.uploaded_file) {
-      setOriginalMedia(`http://127.0.0.1:8000${data.uploaded_file}`);
+      setOriginalMedia(`${base}${data.uploaded_file}?t=${t}`);
       setAnnotatedMedia(null);
     } else {
       if (data.original_image) {
-        setOriginalMedia(`http://127.0.0.1:8000${data.original_image}`);
+        setOriginalMedia(`${base}${data.original_image}?t=${t}`);
       }
       if (data.annotated_image) {
-        setAnnotatedMedia(`http://127.0.0.1:8000${data.annotated_image}`);
+        setAnnotatedMedia(`${base}${data.annotated_image}?t=${t}`);
       }
     }
   } catch (err) {
