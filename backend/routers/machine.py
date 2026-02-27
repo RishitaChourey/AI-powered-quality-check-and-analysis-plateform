@@ -59,7 +59,7 @@ async def predict_machine(file: UploadFile = File(...), background_tasks: Backgr
         conn = get_connection()
         c = conn.cursor()
         c.execute(
-            "INSERT INTO notifications (type, title, message, summary, failed_items) VALUES (?, ?, ?, ?, ?)",
+            "INSERT INTO notifications (type, title, message, summary, failed_items) VALUES (%s, %s, %s, %s, %s)",
             (
                 "machine",
                 "Machine Checkpoint Failure" if failed_items else "Machine Checkpoint Passed",

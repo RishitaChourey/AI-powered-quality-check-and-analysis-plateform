@@ -19,7 +19,8 @@ async def signup(user: User):
     conn = get_connection()
     c = conn.cursor()
 
-    c.execute("SELECT is_verified FROM users WHERE email=?", (user.email,))
+    # 1️⃣ Fetch stored OTP
+    c.execute("SELECT is_verified FROM users WHERE email=%s", (user.email,))
     row = c.fetchone()
 
     otp = str(random.randint(100000, 999999))
@@ -32,11 +33,10 @@ async def signup(user: User):
             raise HTTPException(status_code=400, detail="Email already registered")
         else:
             # User exists but not verified → resend OTP
-            c.execute("""
-                UPDATE users
-                SET otp=?, otp_expiry=?
-                WHERE email=?
-            """, (otp, expiry, user.email))
+            c.execute(
+                "UPDATE users SET otp=%s, otp_expiry=%s WHERE email=%s",
+                (otp, expiry, user.email)
+            )
             conn.commit()
             conn.close()
 
@@ -44,10 +44,10 @@ async def signup(user: User):
             return {"message": "OTP resent. Please verify your email."}
 
     # New user
-    c.execute("""
-        INSERT INTO users (name, email, password, otp, otp_expiry)
-        VALUES (?, ?, ?, ?, ?)
-    """, (user.name, user.email, user.password, otp, expiry))
+    c.execute(
+        "INSERT INTO users (name, email, password, otp, otp_expiry) VALUES (%s, %s, %s, %s, %s)",
+        (user.name, user.email, user.password, otp, expiry)
+    )
 
     conn.commit()
     conn.close()
@@ -60,11 +60,7 @@ def verify_otp(email: str, otp: str):
     conn = get_connection()
     c = conn.cursor()
 
-    # 1️⃣ Fetch stored OTP
-    c.execute(
-        "SELECT otp FROM users WHERE email = ?",
-        (email,)
-    )
+    c.execute("SELECT otp FROM users WHERE email=%s", (email,))
     row = c.fetchone()
 
     if not row:
@@ -80,12 +76,7 @@ def verify_otp(email: str, otp: str):
 
     # 3️⃣ Mark user as verified & clear OTP
     c.execute(
-        """
-        UPDATE users
-        SET is_verified = 1,
-            otp = NULL
-        WHERE email = ?
-        """,
+        "UPDATE users SET is_verified=1, otp=NULL WHERE email=%s",
         (email,)
     )
 
@@ -99,10 +90,10 @@ async def login(user: User):
     conn = get_connection()
     c = conn.cursor()
 
-    c.execute("""
-        SELECT is_verified FROM users
-        WHERE email=? AND password=?
-    """, (user.email, user.password))
+    c.execute(
+        "SELECT is_verified FROM users WHERE email=%s AND password=%s",
+        (user.email, user.password)
+    )
 
     row = c.fetchone()
     conn.close()
@@ -116,9 +107,10 @@ async def login(user: User):
 
         conn = get_connection()
         c = conn.cursor()
-        c.execute("""
-            UPDATE users SET otp=?, otp_expiry=? WHERE email=?
-        """, (otp, expiry, user.email))
+        c.execute(
+            "UPDATE users SET otp=%s, otp_expiry=%s WHERE email=%s",
+            (otp, expiry, user.email)
+        )
         conn.commit()
         conn.close()
 
@@ -136,7 +128,7 @@ async def login(user: User):
     return {"message": "Login successful"}
 
 def send_otp_email(to_email: str, otp: str):
-    sender_email  = "factorysafety00@gmail.com"
+    sender_email = os.getenv("MAIL_FROM")
     app_password = os.getenv("EMAIL_PASS")
 
     msg = EmailMessage()

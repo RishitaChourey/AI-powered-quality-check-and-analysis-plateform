@@ -1,16 +1,14 @@
 # backend/routers/dashboard.py
 from fastapi import APIRouter
 from fastapi.responses import JSONResponse
-import sqlite3, os, json
-
-BASE_DIR = os.path.dirname(os.path.dirname(__file__))
-DB_FILE = os.path.join(BASE_DIR, "users.db")
+import mysql.connector, json
+from db.database import get_connection
 
 router = APIRouter()
 
 @router.get("/api/dashboard")
 async def dashboard_summary():
-    conn = sqlite3.connect(DB_FILE)
+    conn = get_connection()
     c = conn.cursor()
 
     # --- PPE Class summary (cumulative counts) ---
@@ -24,7 +22,7 @@ async def dashboard_summary():
         detection_rows.append({
             "filename": r[0],
             "summary": json.loads(r[1]) if r[1] else {},
-            "created_at": r[2]
+            "created_at": str(r[2])
         })
 
     # --- Machine checkpoint summary (cumulative pass/fail counts) ---
@@ -43,7 +41,7 @@ async def dashboard_summary():
             "filename": r[1],
             "passed_checkpoints": r[2],
             "failed_checkpoints": r[3],
-            "created_at": r[4]
+            "created_at": str(r[4])
         })
 
     conn.close()
@@ -53,10 +51,10 @@ async def dashboard_summary():
     # Define violation keywords
     NEGATIVE_TOKENS = ["no", "missing", "without", "incorrect"]
     violations = sum(
-    int(r["count"])  # ensure integer
-    for r in class_rows
-    if r.get("class_name") and  # make sure not None
-       any(token in r["class_name"].lower() for token in NEGATIVE_TOKENS))
+        int(r["count"])
+        for r in class_rows
+        if r.get("class_name") and any(token in r["class_name"].lower() for token in NEGATIVE_TOKENS)
+    )
     compliance = round(((total - violations) / total) * 100, 2) if total > 0 else 100
 
     # --- Machine Compliance calculation ---
