@@ -4,7 +4,7 @@ from models.users import User
 from db.database import get_connection
 from services.file_utils import clear_folder
 
-import random, os
+import random,os
 import smtplib
 from datetime import datetime, timedelta
 from email.message import EmailMessage
@@ -55,7 +55,6 @@ async def signup(user: User):
     send_otp_email(user.email, otp)
     return {"message": "OTP sent. Please verify your email."}
 
-
 @router.post("/verify-otp")
 def verify_otp(email: str, otp: str):
     conn = get_connection()
@@ -85,7 +84,6 @@ def verify_otp(email: str, otp: str):
     conn.close()
 
     return {"message": "Email verified successfully"}
-
 
 @router.post("/login")
 async def login(user: User):
@@ -129,9 +127,8 @@ async def login(user: User):
 
     return {"message": "Login successful"}
 
-
 def send_otp_email(to_email: str, otp: str):
-    sender_email = "factorysafety00@gmail.com"
+    sender_email = os.getenv("MAIL_FROM")
     app_password = os.getenv("EMAIL_PASS")
 
     msg = EmailMessage()
@@ -153,7 +150,7 @@ def send_otp_email(to_email: str, otp: str):
         Regards,
         AI Quality Assurance Team
         """
-        )
+            )
 
     with smtplib.SMTP("smtp.gmail.com", 587) as server:
         server.starttls()
