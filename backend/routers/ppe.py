@@ -2,10 +2,9 @@ from fastapi import APIRouter, UploadFile, File, BackgroundTasks
 from fastapi.responses import JSONResponse
 import shutil, os, re, json
 from collections import Counter
-from deepface import DeepFace   # NEW import
 from services.file_utils import clear_folder
 
-# Detection services
+# New detection services
 from services.detection_service import (
     process_video_for_ppe,
     process_image_for_ppe
@@ -14,7 +13,7 @@ from services.detection_service import (
 # Email utility
 from services.email_utils.ppe_email import send_ppe_email
 
-# Database utilities
+# Database utilities (kept from old version)
 from db.database import update_class_summary, get_connection
 
 router = APIRouter()
@@ -56,24 +55,6 @@ async def predict(
             unknowns_summary = result.get("unknowns_summary", {})
         else:
             result = process_image_for_ppe(upload_path)
-
-            # 🔹 OPTIONAL: run DeepFace recognition on the uploaded image
-            try:
-                recognition = DeepFace.find(
-                    img_path=upload_path,
-                    db_path="face_embeddings",   # your saved embeddings folder
-                    model_name="Facenet"
-                )
-                # Map DeepFace matches into your result["persons"]
-                for person in result.get("persons", []):
-                    if person["name"] == "Unknown" and len(recognition) > 0:
-                        # Take best match
-                        best_match = recognition[0].iloc[0]["identity"]
-                        clean_name = os.path.splitext(os.path.basename(best_match))[0]
-                        person["name"] = clean_name
-            except Exception:
-                pass
-
             summary_source = {}
             unknown_ppe = set()
             # Build summary from image result
@@ -121,9 +102,11 @@ async def predict(
                 violations=violations
             )
 
-        # ---------------- DATABASE SUMMARY ---------------- #
+        # ---------------- DATABASE SUMMARY (OLD LOGIC) ---------------- #
+        # Flatten detections for DB update
         detections = []
         if is_video:
+            # Use per-person PPE list from video summary
             for person, ppe_list in summary_source.items():
                 for ppe in ppe_list:
                     detections.append({"class": ppe})
@@ -163,8 +146,8 @@ async def predict(
             "uploaded_file": f"/static/uploads/{safe_filename}",
             "detected_frames": frames,
             "data": result,
-            "summary": summary,
-            "violations": violations,
+            "summary": summary,              # flat counts for DB/dashboard
+            "violations": violations,        # structured per-person
             "unknowns_summary": unknowns_summary,
             "original_image": None if is_video else f"/static/uploads/{safe_filename}"
         })

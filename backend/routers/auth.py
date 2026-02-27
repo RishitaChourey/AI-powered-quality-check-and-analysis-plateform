@@ -1,26 +1,25 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter,HTTPException
 from fastapi.responses import JSONResponse
 from models.users import User
 from db.database import get_connection
 from services.file_utils import clear_folder
 
-import random, os, smtplib
+import random, os
+import smtplib
 from datetime import datetime, timedelta
 from email.message import EmailMessage
-
 router = APIRouter()
 
 UPLOADS = "static/uploads"
 FRAMES = "static/detections"
 MACHINE = "static/machine"
 
-
 @router.post("/signup")
 async def signup(user: User):
     conn = get_connection()
     c = conn.cursor()
 
-    # ✅ MySQL placeholder
+    # 1️⃣ Fetch stored OTP
     c.execute("SELECT is_verified FROM users WHERE email=%s", (user.email,))
     row = c.fetchone()
 
@@ -62,7 +61,6 @@ def verify_otp(email: str, otp: str):
     conn = get_connection()
     c = conn.cursor()
 
-    # ✅ MySQL placeholder
     c.execute("SELECT otp FROM users WHERE email=%s", (email,))
     row = c.fetchone()
 
@@ -72,12 +70,12 @@ def verify_otp(email: str, otp: str):
 
     stored_otp = row[0]
 
-    # Compare OTP
+    # 2️⃣ Compare OTP
     if stored_otp != otp:
         conn.close()
         raise HTTPException(status_code=400, detail="Invalid OTP")
 
-    # Mark user as verified & clear OTP
+    # 3️⃣ Mark user as verified & clear OTP
     c.execute(
         "UPDATE users SET is_verified=1, otp=NULL WHERE email=%s",
         (email,)
@@ -155,7 +153,7 @@ def send_otp_email(to_email: str, otp: str):
         Regards,
         AI Quality Assurance Team
         """
-    )
+        )
 
     with smtplib.SMTP("smtp.gmail.com", 587) as server:
         server.starttls()

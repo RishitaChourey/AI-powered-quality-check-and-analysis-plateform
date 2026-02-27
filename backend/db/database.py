@@ -70,7 +70,7 @@ def init_db():
         )
     ''')
 
-    # Checkpoint summary table
+     # Checkpoint summary table (cumulative pass/fail counts per checkpoint)
     c.execute('''
         CREATE TABLE IF NOT EXISTS checkpoint_summary (
             id INT AUTO_INCREMENT PRIMARY KEY,
@@ -80,7 +80,7 @@ def init_db():
         )
     ''')
 
-    # Machine summary table
+    # Machine summary table (per-run stats per machine type)
     c.execute('''
         CREATE TABLE IF NOT EXISTS machine_summary (
             id INT AUTO_INCREMENT PRIMARY KEY,
@@ -91,7 +91,6 @@ def init_db():
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP
         )
     ''')
-
     # Notifications table
     c.execute('''
         CREATE TABLE IF NOT EXISTS notifications (

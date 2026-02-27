@@ -1,3 +1,4 @@
+# backend/routers/dashboard.py
 from fastapi import APIRouter
 from fastapi.responses import JSONResponse
 import mysql.connector, json
@@ -47,6 +48,7 @@ async def dashboard_summary():
 
     # --- PPE Compliance calculation ---
     total = sum(r["count"] for r in class_rows)
+    # Define violation keywords
     NEGATIVE_TOKENS = ["no", "missing", "without", "incorrect"]
     violations = sum(
         int(r["count"])
@@ -61,11 +63,14 @@ async def dashboard_summary():
     machine_compliance = round(((machine_total - machine_failed) / machine_total) * 100, 2) if machine_total > 0 else 100
 
     return JSONResponse({
+        # PPE data
         "class_summary": class_rows,
         "detection_summary": detection_rows,
         "compliance": compliance,
         "violations": violations,
         "total": total,
+
+        # Machine data
         "checkpoint_summary": checkpoint_rows,
         "machine_summary": machine_rows,
         "machine_compliance": machine_compliance,
