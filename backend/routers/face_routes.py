@@ -4,7 +4,7 @@ from services.add_face_service import add_face_embedding
 
 router = APIRouter()
 
-UPLOAD_DIR = "uploads"
+UPLOAD_DIR = "static/uploads"
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 @router.post("/add_face/")
